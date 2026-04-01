@@ -65,6 +65,12 @@ function SidebarLoader({ width }: { width: number }) {
             >
               Repos
             </button>
+            <button
+              className="text-xs font-medium tracking-wide transition-colors px-2 py-1 rounded text-muted-foreground"
+              disabled
+            >
+              Modules
+            </button>
           </div>
           <div className="flex items-center gap-1">
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={true} title="Delete Tasks">

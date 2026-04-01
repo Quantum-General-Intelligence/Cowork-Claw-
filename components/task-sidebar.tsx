@@ -3,7 +3,7 @@
 import { Task } from '@/lib/db/schema'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { AlertCircle, Plus, Trash2, GitBranch, Loader2, Search, X } from 'lucide-react'
+import { AlertCircle, Plus, Trash2, GitBranch, Loader2, Search, X, Server, Globe, Layers, Workflow } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
@@ -28,6 +28,15 @@ import { sessionAtom } from '@/lib/atoms/session'
 import { PRStatusIcon } from '@/components/pr-status-icon'
 import { PRCheckStatus } from '@/components/pr-check-status'
 import { githubConnectionAtom } from '@/lib/atoms/github-connection'
+import { Badge } from '@/components/ui/badge'
+import { MODULES, type ModuleInfo } from '@/lib/modules/registry'
+
+const MODULE_ICONS: Record<ModuleInfo['icon'], React.ComponentType<{ className?: string }>> = {
+  Server,
+  Globe,
+  Layers,
+  Workflow,
+}
 
 // Model mappings for human-friendly names
 const AGENT_MODELS = {
@@ -80,7 +89,7 @@ interface TaskSidebarProps {
   width?: number
 }
 
-type TabType = 'tasks' | 'repos'
+type TabType = 'tasks' | 'repos' | 'modules'
 
 interface GitHubRepoInfo {
   name: string
@@ -259,6 +268,15 @@ export function TaskSidebar({ tasks, width = 288 }: TaskSidebarProps) {
     }
   }, [githubConnection.connected])
 
+  // Auto-switch tab based on current route
+  useEffect(() => {
+    if (pathname.startsWith('/modules')) {
+      setActiveTab('modules')
+    } else if (pathname.startsWith('/repos')) {
+      setActiveTab('repos')
+    }
+  }, [pathname])
+
   // Infinite scroll observer
   useEffect(() => {
     const isLoading = isSearching ? searchLoading : reposLoading
@@ -400,6 +418,17 @@ export function TaskSidebar({ tasks, width = 288 }: TaskSidebarProps) {
               >
                 Repos
               </button>
+              <button
+                onClick={() => setActiveTab('modules')}
+                className={cn(
+                  'text-xs font-medium tracking-wide transition-colors px-2 py-1 rounded',
+                  activeTab === 'modules'
+                    ? 'text-foreground bg-accent'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+                )}
+              >
+                Modules
+              </button>
             </div>
             <div className="flex items-center gap-1">
               <Button
@@ -434,6 +463,47 @@ export function TaskSidebar({ tasks, width = 288 }: TaskSidebarProps) {
                 Sign in to view repositories
               </CardContent>
             </Card>
+          )}
+          {activeTab === 'modules' && (
+            <div className="space-y-1">
+              {MODULES.map((mod) => {
+                const modPath = `/modules/${mod.slug}`
+                const isActive = pathname === modPath || pathname.startsWith(modPath + '/')
+                const Icon = MODULE_ICONS[mod.icon]
+                return (
+                  <Link
+                    key={mod.slug}
+                    href={modPath}
+                    onClick={handleLinkClick}
+                    className={cn('block rounded-lg', isActive && 'ring-1 ring-primary/50 ring-offset-0')}
+                  >
+                    <Card
+                      className={cn(
+                        'cursor-pointer transition-colors hover:bg-accent p-0 rounded-lg',
+                        isActive && 'bg-accent',
+                      )}
+                    >
+                      <CardContent className="px-3 py-2">
+                        <div className="flex gap-2 items-center">
+                          <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-xs font-medium truncate mb-0.5">{mod.name}</h3>
+                            <p className="text-xs text-muted-foreground truncate">{mod.shortDescription}</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                )
+              })}
+              <div className="pt-1">
+                <Link href="/modules" onClick={handleLinkClick}>
+                  <Button variant="ghost" size="sm" className="w-full justify-start h-7 px-2 text-xs">
+                    View All Modules
+                  </Button>
+                </Link>
+              </div>
+            </div>
           )}
         </div>
       </div>
@@ -470,6 +540,17 @@ export function TaskSidebar({ tasks, width = 288 }: TaskSidebarProps) {
               )}
             >
               Repos
+            </button>
+            <button
+              onClick={() => setActiveTab('modules')}
+              className={cn(
+                'text-xs font-medium tracking-wide transition-colors px-2 py-1 rounded',
+                activeTab === 'modules'
+                  ? 'text-foreground bg-accent'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+              )}
+            >
+              Modules
             </button>
           </div>
           <div className="flex items-center gap-1">
@@ -709,6 +790,52 @@ export function TaskSidebar({ tasks, width = 288 }: TaskSidebarProps) {
                 )}
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Modules Tab Content */}
+      {activeTab === 'modules' && (
+        <div className="space-y-1">
+          {MODULES.map((mod) => {
+            const modPath = `/modules/${mod.slug}`
+            const isActive = pathname === modPath || pathname.startsWith(modPath + '/')
+            const Icon = MODULE_ICONS[mod.icon]
+            return (
+              <Link
+                key={mod.slug}
+                href={modPath}
+                onClick={handleLinkClick}
+                className={cn('block rounded-lg', isActive && 'ring-1 ring-primary/50 ring-offset-0')}
+              >
+                <Card
+                  className={cn(
+                    'cursor-pointer transition-colors hover:bg-accent p-0 rounded-lg',
+                    isActive && 'bg-accent',
+                  )}
+                >
+                  <CardContent className="px-3 py-2">
+                    <div className="flex gap-2 items-center">
+                      <Icon className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-xs font-medium truncate mb-0.5">{mod.name}</h3>
+                        <p className="text-xs text-muted-foreground truncate">{mod.shortDescription}</p>
+                      </div>
+                      <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                        {mod.status}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </Link>
+            )
+          })}
+          <div className="pt-1">
+            <Link href="/modules" onClick={handleLinkClick}>
+              <Button variant="ghost" size="sm" className="w-full justify-start h-7 px-2 text-xs">
+                View All Modules
+              </Button>
+            </Link>
           </div>
         </div>
       )}

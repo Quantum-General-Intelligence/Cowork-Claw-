@@ -1,0 +1,12 @@
+[submodule "modules/vercel-openclaw"]
+	path = modules/vercel-openclaw
+	url = https://github.com/vercel-labs/vercel-openclaw.git
+[submodule "modules/agent-browser"]
+	path = modules/agent-browser
+	url = https://github.com/vercel-labs/agent-browser.git
+[submodule "modules/json-render"]
+	path = modules/json-render
+	url = https://github.com/vercel-labs/json-render.git
+[submodule "modules/workflow-builder-template"]
+	path = modules/workflow-builder-template
+	url = https://github.com/vercel-labs/workflow-builder-template.git
