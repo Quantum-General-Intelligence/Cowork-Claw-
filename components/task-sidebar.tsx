@@ -7,7 +7,7 @@ import { AlertCircle, Plus, Trash2, GitBranch, Loader2, Search, X, Server, Globe
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode } from '@/components/logos'
+import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw } from '@/components/logos'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -82,6 +82,8 @@ const AGENT_MODELS = {
     { value: 'claude-opus-4-5', label: 'Opus 4.5' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
   ],
+  openclaw: [{ value: 'default', label: 'Default' }],
+  orchestrate: [{ value: 'auto', label: 'Auto' }],
 } as const
 
 interface TaskSidebarProps {
@@ -380,6 +382,9 @@ export function TaskSidebar({ tasks, width = 288 }: TaskSidebarProps) {
         return Gemini
       case 'opencode':
         return OpenCode
+      case 'openclaw':
+      case 'orchestrate':
+        return OpenClaw
       default:
         return null
     }
@@ -441,7 +446,7 @@ export function TaskSidebar({ tasks, width = 288 }: TaskSidebarProps) {
               >
                 <Trash2 className="h-4 w-4" />
               </Button>
-              <Link href="/" onClick={handleLinkClick}>
+              <Link href="/new" onClick={handleLinkClick}>
                 <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="New Task">
                   <Plus className="h-4 w-4" />
                 </Button>

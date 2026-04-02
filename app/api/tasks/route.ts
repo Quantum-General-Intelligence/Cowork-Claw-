@@ -578,11 +578,16 @@ async function processTask(
     }
 
     // Sanitize prompt to prevent CLI option parsing issues
-    const sanitizedPrompt = prompt
+    let sanitizedPrompt = prompt
       .replace(/`/g, "'") // Replace backticks with single quotes
       .replace(/\$/g, '') // Remove dollar signs
       .replace(/\\/g, '') // Remove backslashes
       .replace(/^-/gm, ' -') // Prefix lines starting with dash to avoid CLI option parsing
+
+    // Enhance prompt with browser availability hint
+    if (enableBrowser) {
+      sanitizedPrompt = `[Browser automation is available. Use the agent-browser CLI to navigate websites, interact with pages, take screenshots, and extract data. Start with: agent-browser open <url>, then agent-browser snapshot -i to see interactive elements.]\n\n${sanitizedPrompt}`
+    }
 
     // Generate agent message ID for streaming updates
     const agentMessageId = generateId()

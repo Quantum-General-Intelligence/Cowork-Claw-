@@ -23,6 +23,7 @@ import { toast } from 'sonner'
 import { Streamdown } from 'streamdown'
 import { useAtom } from 'jotai'
 import { taskChatInputAtomFamily } from '@/lib/atoms/task'
+import { BrowserScreenshots } from '@/components/browser-screenshot'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 interface TaskChatProps {
@@ -1121,6 +1122,7 @@ export function TaskChat({ taskId, task }: TaskChatProps) {
                               </Streamdown>
                             )
                           })()}
+                      {task.enableBrowser && <BrowserScreenshots taskId={task.id} content={agentMessage.content} />}
                     </div>
                     <div className="flex items-center gap-0.5 justify-end">
                       {/* Show copy button only when task is complete */}

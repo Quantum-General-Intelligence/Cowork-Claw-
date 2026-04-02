@@ -11,6 +11,8 @@ const AGENT_PROVIDER_MAP: Record<string, Provider | null> = {
   cursor: 'cursor',
   gemini: 'gemini',
   opencode: 'openai', // OpenCode can use OpenAI or Anthropic, but primarily OpenAI
+  openclaw: 'aigateway', // OpenClaw uses Vercel AI Gateway
+  orchestrate: 'aigateway', // Orchestrator uses OpenClaw which uses AI Gateway
 }
 
 // Check if a model is an Anthropic model

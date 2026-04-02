@@ -31,11 +31,12 @@ import {
   Plus,
   Maximize,
   Minimize,
+  Globe,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode } from '@/components/logos'
+import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw } from '@/components/logos'
 import { useTasks } from '@/components/app-layout'
 import {
   getShowFilesPane,
@@ -159,6 +160,8 @@ const AGENT_MODELS = {
     { value: 'claude-opus-4-5', label: 'Opus 4.5' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
   ],
+  openclaw: [{ value: 'default', label: 'Default' }],
+  orchestrate: [{ value: 'auto', label: 'Auto' }],
 } as const
 
 const DEFAULT_MODELS = {
@@ -682,6 +685,9 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
         return Gemini
       case 'opencode':
         return OpenCode
+      case 'openclaw':
+      case 'orchestrate':
+        return OpenClaw
       default:
         return null
     }
@@ -731,6 +737,8 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
       { value: 'claude-opus-4-5', label: 'Opus 4.5' },
       { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
     ],
+    openclaw: [{ value: 'default', label: 'Default' }],
+    orchestrate: [{ value: 'auto', label: 'Auto' }],
   }
 
   // Get readable model name
@@ -1628,6 +1636,11 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
                   const AgentLogo = getAgentLogo(task.selectedAgent)
                   return AgentLogo ? <AgentLogo className="w-3.5 h-3.5 md:w-4 md:h-4 flex-shrink-0" /> : null
                 })()}
+              {task.enableBrowser && (
+                <span title="Browser automation enabled">
+                  <Globe className="w-3.5 h-3.5 md:w-4 md:h-4 text-green-500 flex-shrink-0" />
+                </span>
+              )}
               {task.selectedModel && (
                 <span className="text-muted-foreground whitespace-nowrap">
                   {getModelName(task.selectedModel, task.selectedAgent)}

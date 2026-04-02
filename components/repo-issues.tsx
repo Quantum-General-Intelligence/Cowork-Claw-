@@ -27,6 +27,7 @@ import Copilot from '@/components/logos/copilot'
 import Cursor from '@/components/logos/cursor'
 import Gemini from '@/components/logos/gemini'
 import OpenCode from '@/components/logos/opencode'
+import OpenClaw from '@/components/logos/openclaw'
 
 const CODING_AGENTS = [
   { value: 'claude', label: 'Claude', icon: Claude },
@@ -35,6 +36,8 @@ const CODING_AGENTS = [
   { value: 'cursor', label: 'Cursor', icon: Cursor },
   { value: 'gemini', label: 'Gemini', icon: Gemini },
   { value: 'opencode', label: 'opencode', icon: OpenCode },
+  { value: 'openclaw', label: 'OpenClaw', icon: OpenClaw },
+  { value: 'orchestrate', label: 'Orchestrate', icon: OpenClaw },
 ] as const
 
 const AGENT_MODELS = {
@@ -84,6 +87,8 @@ const AGENT_MODELS = {
     { value: 'claude-opus-4-5', label: 'Opus 4.5' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
   ],
+  openclaw: [{ value: 'default', label: 'Default' }],
+  orchestrate: [{ value: 'auto', label: 'Auto' }],
 } as const
 
 const DEFAULT_MODELS = {

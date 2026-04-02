@@ -76,7 +76,7 @@ function SidebarLoader({ width }: { width: number }) {
             <Button variant="ghost" size="sm" className="h-8 w-8 p-0" disabled={true} title="Delete Tasks">
               <Trash2 className="h-4 w-4" />
             </Button>
-            <Link href="/">
+            <Link href="/new">
               <Button variant="ghost" size="sm" className="h-8 w-8 p-0" title="New Task">
                 <Plus className="h-4 w-4" />
               </Button>

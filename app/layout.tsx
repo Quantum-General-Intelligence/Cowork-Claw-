@@ -20,9 +20,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Coding Agent Template',
+  title: 'Cowork-Claw',
   description:
-    'AI-powered coding agent template supporting Claude Code, OpenAI Codex CLI, Cursor CLI, and opencode with Vercel Sandbox',
+    'AI agent orchestration platform — OpenClaw coordinates a team of coding agents to accomplish your tasks',
 }
 
 export default function RootLayout({

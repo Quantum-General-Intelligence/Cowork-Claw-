@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Loader2, ArrowUp, Settings, X, Cable, Users, Globe } from 'lucide-react'
-import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode } from '@/components/logos'
+import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw } from '@/components/logos'
 import { setInstallDependencies, setMaxDuration, setKeepAlive, setEnableBrowser } from '@/lib/utils/cookies'
 import { useConnectors } from '@/components/connectors-provider'
 import { ConnectorDialog } from '@/components/connectors/manage-connectors'
@@ -67,6 +67,9 @@ const CODING_AGENTS = [
   { value: 'cursor', label: 'Cursor', icon: Cursor, isLogo: true },
   { value: 'gemini', label: 'Gemini', icon: Gemini, isLogo: true },
   { value: 'opencode', label: 'opencode', icon: OpenCode, isLogo: true },
+  { value: 'divider2', label: '', icon: () => null, isLogo: false, isDivider: true },
+  { value: 'openclaw', label: 'OpenClaw', icon: OpenClaw, isLogo: true },
+  { value: 'orchestrate', label: 'Orchestrate', icon: OpenClaw, isLogo: true },
 ] as const
 
 // Model options for each agent
@@ -118,6 +121,13 @@ const AGENT_MODELS = {
     { value: 'claude-opus-4-5', label: 'Opus 4.5' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
   ],
+  openclaw: [{ value: 'default', label: 'Default (AI Gateway)' }],
+  orchestrate: [
+    { value: 'auto', label: 'Auto (Best Agent)' },
+    { value: 'claude', label: 'Prefer Claude' },
+    { value: 'codex', label: 'Prefer Codex' },
+    { value: 'gemini', label: 'Prefer Gemini' },
+  ],
 } as const
 
 // Default models for each agent
@@ -128,6 +138,8 @@ const DEFAULT_MODELS = {
   cursor: 'auto',
   gemini: 'gemini-3-pro-preview',
   opencode: 'gpt-5',
+  openclaw: 'default',
+  orchestrate: 'auto',
 } as const
 
 // API key requirements for each agent
@@ -138,6 +150,8 @@ const AGENT_API_KEY_REQUIREMENTS: Record<string, Provider[]> = {
   cursor: ['cursor'],
   gemini: ['gemini'],
   opencode: [], // Will be determined dynamically based on selected model
+  openclaw: ['aigateway'], // OpenClaw uses AI Gateway
+  orchestrate: ['aigateway'], // Orchestrator uses OpenClaw which uses AI Gateway
 }
 
 type Provider = 'openai' | 'gemini' | 'cursor' | 'anthropic' | 'aigateway'

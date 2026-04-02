@@ -23,7 +23,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { Session } from '@/lib/session/types'
-import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode } from '@/components/logos'
+import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw } from '@/components/logos'
 import { PRStatusIcon } from '@/components/pr-status-icon'
 import { PRCheckStatus } from '@/components/pr-check-status'
 
@@ -81,6 +81,8 @@ const AGENT_MODELS = {
     { value: 'claude-opus-4-5', label: 'Opus 4.5' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
   ],
+  openclaw: [{ value: 'default', label: 'Default' }],
+  orchestrate: [{ value: 'auto', label: 'Auto' }],
 } as const
 
 function getTimeAgo(date: Date): string {
@@ -248,6 +250,9 @@ export function TasksListClient({ user, authProvider, initialStars = 1200 }: Tas
         return Gemini
       case 'opencode':
         return OpenCode
+      case 'openclaw':
+      case 'orchestrate':
+        return OpenClaw
       default:
         return null
     }

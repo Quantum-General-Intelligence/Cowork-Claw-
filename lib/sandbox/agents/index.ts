@@ -6,10 +6,12 @@ import { executeCopilotInSandbox } from './copilot'
 import { executeCursorInSandbox } from './cursor'
 import { executeGeminiInSandbox } from './gemini'
 import { executeOpenCodeInSandbox } from './opencode'
+import { executeOpenClawInSandbox } from './openclaw'
+import { executeOrchestrateInSandbox } from './orchestrate'
 import { TaskLogger } from '@/lib/utils/task-logger'
 import { Connector } from '@/lib/db/schema'
 
-export type AgentType = 'claude' | 'codex' | 'copilot' | 'cursor' | 'gemini' | 'opencode'
+export type AgentType = 'claude' | 'codex' | 'copilot' | 'cursor' | 'gemini' | 'opencode' | 'openclaw' | 'orchestrate'
 
 // Re-export types
 export type { AgentExecutionResult } from '../types'
@@ -136,6 +138,32 @@ export async function executeAgentInSandbox(
           mcpServers,
           isResumed,
           sessionId,
+        )
+
+      case 'openclaw':
+        return await executeOpenClawInSandbox(
+          sandbox,
+          instruction,
+          logger,
+          selectedModel,
+          mcpServers,
+          isResumed,
+          sessionId,
+          taskId,
+          agentMessageId,
+        )
+
+      case 'orchestrate':
+        return await executeOrchestrateInSandbox(
+          sandbox,
+          instruction,
+          logger,
+          selectedModel,
+          mcpServers,
+          isResumed,
+          sessionId,
+          taskId,
+          agentMessageId,
         )
 
       default:

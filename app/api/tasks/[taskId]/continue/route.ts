@@ -105,6 +105,8 @@ export async function POST(req: NextRequest, context: { params: Promise<{ taskId
         userApiKeys,
         userGithubToken,
         githubUser,
+        task.keepAlive || false,
+        task.enableBrowser || false,
       )
     })
 
@@ -137,6 +139,8 @@ async function continueTask(
     name: string | null
     email: string | null
   } | null,
+  keepAlive: boolean = false,
+  enableBrowser: boolean = false,
 ) {
   let sandbox: Sandbox | null = null
   let isResumedSandbox = false // Track if we reconnected to existing sandbox
@@ -217,6 +221,8 @@ async function continueTask(
           selectedAgent,
           selectedModel,
           installDependencies,
+          keepAlive,
+          enableBrowser,
           preDeterminedBranchName: branchName, // Use existing branch
           onProgress: async (progress: number, message: string) => {
             await logger.updateProgress(progress, message)
@@ -257,11 +263,16 @@ async function continueTask(
 
     // Build conversation history context - put the new request FIRST, then context
     // Sanitize the current prompt to prevent CLI option parsing issues
-    const sanitizedPrompt = prompt
+    let sanitizedPrompt = prompt
       .replace(/`/g, "'") // Replace backticks with single quotes
       .replace(/\$/g, '') // Remove dollar signs
       .replace(/\\/g, '') // Remove backslashes
       .replace(/^-/gm, ' -') // Prefix lines starting with dash to avoid CLI option parsing
+
+    // Enhance prompt with browser availability hint
+    if (enableBrowser) {
+      sanitizedPrompt = `[Browser automation is available via agent-browser CLI.]\n\n${sanitizedPrompt}`
+    }
 
     let promptWithContext = sanitizedPrompt
     // Only add conversation history if NOT using a resumed sandbox
