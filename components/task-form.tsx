@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Loader2, ArrowUp, Settings, X, Cable, Users, Globe } from 'lucide-react'
-import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw } from '@/components/logos'
+import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw, Pi } from '@/components/logos'
 import { setInstallDependencies, setMaxDuration, setKeepAlive, setEnableBrowser } from '@/lib/utils/cookies'
 import { useConnectors } from '@/components/connectors-provider'
 import { ConnectorDialog } from '@/components/connectors/manage-connectors'
@@ -67,6 +67,7 @@ const CODING_AGENTS = [
   { value: 'cursor', label: 'Cursor', icon: Cursor, isLogo: true },
   { value: 'gemini', label: 'Gemini', icon: Gemini, isLogo: true },
   { value: 'opencode', label: 'opencode', icon: OpenCode, isLogo: true },
+  { value: 'pi', label: 'Pi', icon: Pi, isLogo: true },
   { value: 'divider2', label: '', icon: () => null, isLogo: false, isDivider: true },
   { value: 'openclaw', label: 'OpenClaw', icon: OpenClaw, isLogo: true },
   { value: 'orchestrate', label: 'Orchestrate', icon: OpenClaw, isLogo: true },
@@ -121,6 +122,12 @@ const AGENT_MODELS = {
     { value: 'claude-opus-4-5', label: 'Opus 4.5' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
   ],
+  pi: [
+    { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
+    { value: 'claude-opus-4-5', label: 'Opus 4.5' },
+    { value: 'gpt-5', label: 'GPT-5' },
+    { value: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
+  ],
   openclaw: [{ value: 'default', label: 'Default (AI Gateway)' }],
   orchestrate: [
     { value: 'auto', label: 'Auto (Best Agent)' },
@@ -138,6 +145,7 @@ const DEFAULT_MODELS = {
   cursor: 'auto',
   gemini: 'gemini-3-pro-preview',
   opencode: 'gpt-5',
+  pi: 'claude-sonnet-4-5',
   openclaw: 'default',
   orchestrate: 'auto',
 } as const
@@ -150,6 +158,7 @@ const AGENT_API_KEY_REQUIREMENTS: Record<string, Provider[]> = {
   cursor: ['cursor'],
   gemini: ['gemini'],
   opencode: [], // Will be determined dynamically based on selected model
+  pi: ['anthropic'], // Pi supports multiple providers
   openclaw: ['aigateway'], // OpenClaw uses AI Gateway
   orchestrate: ['aigateway'], // Orchestrator uses OpenClaw which uses AI Gateway
 }

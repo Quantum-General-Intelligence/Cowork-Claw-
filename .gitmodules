@@ -10,3 +10,6 @@
 [submodule "modules/workflow-builder-template"]
 	path = modules/workflow-builder-template
 	url = https://github.com/vercel-labs/workflow-builder-template.git
+[submodule "modules/pi-mono"]
+	path = modules/pi-mono
+	url = https://github.com/TheoSym/pi-mono.git

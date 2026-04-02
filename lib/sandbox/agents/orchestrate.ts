@@ -11,6 +11,7 @@ import { executeCursorInSandbox } from './cursor'
 import { executeGeminiInSandbox } from './gemini'
 import { executeOpenCodeInSandbox } from './opencode'
 import { executeOpenClawInSandbox } from './openclaw'
+import { executePiInSandbox } from './pi'
 
 type Connector = typeof connectors.$inferSelect
 
@@ -24,6 +25,7 @@ Available agents and their strengths:
 - gemini: Google's model, good for research and analysis tasks.
 - opencode: Open-source code generation, supports multiple models.
 - openclaw: Full AI agent runtime with skills (web search, vision, worker-sandboxes).
+- pi: Extensible coding agent framework with 15+ LLM providers, stateful sessions, and built-in tools.
 
 Analyze the task, then respond with ONLY a JSON object (no markdown, no explanation):
 {
@@ -121,6 +123,18 @@ async function executeSubAgent(
         taskId,
         agentMessageId,
       )
+    case 'pi':
+      return executePiInSandbox(
+        sandbox,
+        instruction,
+        logger,
+        selectedModel,
+        mcpServers,
+        isResumed,
+        sessionId,
+        taskId,
+        agentMessageId,
+      )
     default:
       // Default to Claude for unknown agents
       return executeClaudeInSandbox(
@@ -200,7 +214,7 @@ export async function executeOrchestrateInSandbox(
   }
 
   // Validate chosen agent
-  const validAgents = ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode', 'openclaw']
+  const validAgents = ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode', 'openclaw', 'pi']
   if (!validAgents.includes(chosenAgent)) {
     await logger.info(`Invalid agent "${chosenAgent}", defaulting to Claude`)
     chosenAgent = 'claude'

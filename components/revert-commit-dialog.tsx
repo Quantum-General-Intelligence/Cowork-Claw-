@@ -14,7 +14,7 @@ import {
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Label } from '@/components/ui/label'
-import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw } from '@/components/logos'
+import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw, Pi } from '@/components/logos'
 
 interface Commit {
   sha: string
@@ -57,6 +57,7 @@ const CODING_AGENTS = [
   { value: 'cursor', label: 'Cursor', icon: Cursor },
   { value: 'gemini', label: 'Gemini', icon: Gemini },
   { value: 'opencode', label: 'opencode', icon: OpenCode },
+  { value: 'pi', label: 'Pi', icon: Pi },
   { value: 'openclaw', label: 'OpenClaw', icon: OpenClaw },
   { value: 'orchestrate', label: 'Orchestrate', icon: OpenClaw },
 ] as const
@@ -104,6 +105,10 @@ const AGENT_MODELS = {
     { value: 'claude-opus-4-5', label: 'Opus 4.5' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
   ],
+  pi: [
+    { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
+    { value: 'gpt-5', label: 'GPT-5' },
+  ],
   openclaw: [{ value: 'default', label: 'Default' }],
   orchestrate: [{ value: 'auto', label: 'Auto' }],
 } as const
@@ -115,6 +120,7 @@ const DEFAULT_MODELS = {
   cursor: 'auto',
   gemini: 'gemini-3-pro-preview',
   opencode: 'gpt-5',
+  pi: 'claude-sonnet-4-5',
   openclaw: 'default',
   orchestrate: 'auto',
 } as const

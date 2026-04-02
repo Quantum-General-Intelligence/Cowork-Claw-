@@ -87,6 +87,25 @@ export const MODULES: ModuleInfo[] = [
       'Real integrations (Slack, GitHub, Linear, Stripe)',
     ],
   },
+  {
+    slug: 'pi-mono',
+    name: 'Pi Coding Agent',
+    shortDescription: 'Extensible AI coding agent framework',
+    description:
+      'Comprehensive AI agent framework and CLI for building extensible coding agents. Supports 15+ LLM providers, stateful sessions with branching, built-in tools (read, write, edit, bash, grep), and multiple run modes (interactive, headless, RPC).',
+    icon: 'Layers' as const,
+    repoUrl: 'https://github.com/TheoSym/pi-mono',
+    status: 'active' as const,
+    tags: ['agent', 'framework', 'cli'],
+    features: [
+      '15+ LLM provider support',
+      'Built-in coding tools',
+      'Stateful session management',
+      'Extension & skill system',
+      'Multiple run modes (TUI, headless, RPC)',
+      'Multi-provider model switching',
+    ],
+  },
 ]
 
 export function getModuleBySlug(slug: string): ModuleInfo | undefined {

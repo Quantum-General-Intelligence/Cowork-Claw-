@@ -8,10 +8,20 @@ import { executeGeminiInSandbox } from './gemini'
 import { executeOpenCodeInSandbox } from './opencode'
 import { executeOpenClawInSandbox } from './openclaw'
 import { executeOrchestrateInSandbox } from './orchestrate'
+import { executePiInSandbox } from './pi'
 import { TaskLogger } from '@/lib/utils/task-logger'
 import { Connector } from '@/lib/db/schema'
 
-export type AgentType = 'claude' | 'codex' | 'copilot' | 'cursor' | 'gemini' | 'opencode' | 'openclaw' | 'orchestrate'
+export type AgentType =
+  | 'claude'
+  | 'codex'
+  | 'copilot'
+  | 'cursor'
+  | 'gemini'
+  | 'opencode'
+  | 'openclaw'
+  | 'orchestrate'
+  | 'pi'
 
 // Re-export types
 export type { AgentExecutionResult } from '../types'
@@ -155,6 +165,19 @@ export async function executeAgentInSandbox(
 
       case 'orchestrate':
         return await executeOrchestrateInSandbox(
+          sandbox,
+          instruction,
+          logger,
+          selectedModel,
+          mcpServers,
+          isResumed,
+          sessionId,
+          taskId,
+          agentMessageId,
+        )
+
+      case 'pi':
+        return await executePiInSandbox(
           sandbox,
           instruction,
           logger,

@@ -36,7 +36,7 @@ import {
 import { cn } from '@/lib/utils'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { toast } from 'sonner'
-import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw } from '@/components/logos'
+import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw, Pi } from '@/components/logos'
 import { useTasks } from '@/components/app-layout'
 import {
   getShowFilesPane,
@@ -159,6 +159,10 @@ const AGENT_MODELS = {
     { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
     { value: 'claude-opus-4-5', label: 'Opus 4.5' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
+  ],
+  pi: [
+    { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
+    { value: 'gpt-5', label: 'GPT-5' },
   ],
   openclaw: [{ value: 'default', label: 'Default' }],
   orchestrate: [{ value: 'auto', label: 'Auto' }],
@@ -685,6 +689,8 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
         return Gemini
       case 'opencode':
         return OpenCode
+      case 'pi':
+        return Pi
       case 'openclaw':
       case 'orchestrate':
         return OpenClaw

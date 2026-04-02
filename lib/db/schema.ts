@@ -121,7 +121,7 @@ export const insertTaskSchema = z.object({
   title: z.string().optional(),
   repoUrl: z.string().url('Must be a valid URL').optional(),
   selectedAgent: z
-    .enum(['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode', 'openclaw', 'orchestrate'])
+    .enum(['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode', 'openclaw', 'orchestrate', 'pi'])
     .default('claude'),
   selectedModel: z.string().optional(),
   installDependencies: z.boolean().default(false),

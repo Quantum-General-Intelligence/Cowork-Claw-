@@ -23,7 +23,7 @@ import { toast } from 'sonner'
 import { useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import type { Session } from '@/lib/session/types'
-import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw } from '@/components/logos'
+import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw, Pi } from '@/components/logos'
 import { PRStatusIcon } from '@/components/pr-status-icon'
 import { PRCheckStatus } from '@/components/pr-check-status'
 
@@ -80,6 +80,10 @@ const AGENT_MODELS = {
     { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
     { value: 'claude-opus-4-5', label: 'Opus 4.5' },
     { value: 'claude-haiku-4-5', label: 'Haiku 4.5' },
+  ],
+  pi: [
+    { value: 'claude-sonnet-4-5', label: 'Sonnet 4.5' },
+    { value: 'gpt-5', label: 'GPT-5' },
   ],
   openclaw: [{ value: 'default', label: 'Default' }],
   orchestrate: [{ value: 'auto', label: 'Auto' }],
@@ -250,6 +254,8 @@ export function TasksListClient({ user, authProvider, initialStars = 1200 }: Tas
         return Gemini
       case 'opencode':
         return OpenCode
+      case 'pi':
+        return Pi
       case 'openclaw':
       case 'orchestrate':
         return OpenClaw
