@@ -1,5 +1,9 @@
 import { NextRequest } from 'next/server'
 import { getServerSession } from '@/lib/session/get-server-session'
+import { db } from '@/lib/db/client'
+import { tasks, insertTaskSchema } from '@/lib/db/schema'
+import { generateId } from '@/lib/utils/id'
+import { eq } from 'drizzle-orm'
 
 const ORCHESTRATOR_SYSTEM_PROMPT = `You are OpenClaw, the AI orchestrator for the Cowork-Claw platform. You coordinate a team of AI coding agents to accomplish tasks for the user.
 
@@ -17,20 +21,18 @@ Available agents and their strengths:
 - **Cursor**: Excellent at targeted code editing with file detection and advanced configuration
 - **Gemini**: Good for research, analysis, and tasks requiring broad knowledge
 - **OpenCode**: Versatile open-source code generation supporting multiple model backends
+- **Pi**: Extensible coding agent framework with 15+ LLM providers and stateful sessions
+- **OpenClaw**: Full AI agent runtime with skills (web search, vision, worker-sandboxes)
 
-When the user describes a task:
-1. Analyze the task complexity and requirements
-2. If simple: recommend a single agent and explain why
-3. If complex: break it into sub-tasks and assign each to the best agent
-4. Always explain your reasoning
-5. Ask which repository to work on if not already specified
-
-Be conversational, concise, and helpful. You are the user's AI team lead — they tell you what they want, and you coordinate the team to deliver it.
+When the user wants to execute a task, you have a tool called "create_task" to dispatch it. Use it when:
+- The user has clearly described what they want done
+- You know which repository to work on
+- You've confirmed the approach with the user
 
 When responding about agent assignments, format them clearly:
 - **Agent**: task description
 
-Keep responses focused and actionable. Don't over-explain — the user can ask follow-up questions.`
+Keep responses focused and actionable. You are the user's AI team lead.`
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession()
@@ -46,9 +48,7 @@ export async function POST(req: NextRequest) {
 
   if (!aiGatewayKey && !anthropicKey) {
     return Response.json(
-      {
-        error: 'No API key configured. Set AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY in your environment.',
-      },
+      { error: 'No API key configured. Set AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY.' },
       { status: 503 },
     )
   }
@@ -56,6 +56,34 @@ export async function POST(req: NextRequest) {
   const useGateway = !!aiGatewayKey
   const apiUrl = useGateway ? 'https://ai-gateway.vercel.sh/v1/messages' : 'https://api.anthropic.com/v1/messages'
   const apiKey = useGateway ? aiGatewayKey! : anthropicKey!
+
+  // Define the create_task tool for Anthropic API
+  const tools = [
+    {
+      name: 'create_task',
+      description:
+        'Create a coding task that dispatches an AI agent to work on a repository. Use this when the user has confirmed what they want done.',
+      input_schema: {
+        type: 'object' as const,
+        properties: {
+          prompt: {
+            type: 'string',
+            description: 'Detailed description of the coding task for the agent',
+          },
+          repoUrl: {
+            type: 'string',
+            description: 'GitHub repository URL (e.g., https://github.com/owner/repo)',
+          },
+          selectedAgent: {
+            type: 'string',
+            enum: ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode', 'openclaw', 'orchestrate', 'pi'],
+            description: 'Which agent to assign the task to',
+          },
+        },
+        required: ['prompt', 'repoUrl', 'selectedAgent'],
+      },
+    },
+  ]
 
   const response = await fetch(apiUrl, {
     method: 'POST',
@@ -68,6 +96,7 @@ export async function POST(req: NextRequest) {
       model: 'claude-sonnet-4-5-20241022',
       max_tokens: 4096,
       system: ORCHESTRATOR_SYSTEM_PROMPT,
+      tools,
       messages: messages.map((m: { role: string; content: string }) => ({
         role: m.role,
         content: m.content,
@@ -78,11 +107,11 @@ export async function POST(req: NextRequest) {
 
   if (!response.ok) {
     const error = await response.text()
-    console.error('Anthropic API error:', error)
+    console.error('API error:', error)
     return new Response('Failed to generate response', { status: 500 })
   }
 
-  // Transform Anthropic SSE stream to AI SDK data stream format
+  // Transform Anthropic SSE stream to our format, handling tool calls
   const encoder = new TextEncoder()
   const readable = new ReadableStream({
     async start(controller) {
@@ -94,6 +123,8 @@ export async function POST(req: NextRequest) {
 
       const decoder = new TextDecoder()
       let buffer = ''
+      let currentToolName = ''
+      let currentToolInput = ''
 
       try {
         while (true) {
@@ -105,19 +136,69 @@ export async function POST(req: NextRequest) {
           buffer = lines.pop() || ''
 
           for (const line of lines) {
-            if (line.startsWith('data: ')) {
-              const data = line.slice(6).trim()
-              if (data === '[DONE]') continue
+            if (!line.startsWith('data: ')) continue
+            const data = line.slice(6).trim()
+            if (data === '[DONE]') continue
 
-              try {
-                const event = JSON.parse(data)
-                if (event.type === 'content_block_delta' && event.delta?.type === 'text_delta') {
-                  // AI SDK data stream format: "0:" prefix with JSON-encoded string
+            try {
+              const event = JSON.parse(data)
+
+              if (event.type === 'content_block_start') {
+                if (event.content_block?.type === 'tool_use') {
+                  currentToolName = event.content_block.name || ''
+                  currentToolInput = ''
+                  // Send tool start indicator
+                  controller.enqueue(
+                    encoder.encode(`0:${JSON.stringify(`\n\n🔧 Dispatching task with ${currentToolName}...\n\n`)}\n`),
+                  )
+                }
+              }
+
+              if (event.type === 'content_block_delta') {
+                if (event.delta?.type === 'text_delta' && event.delta.text) {
                   controller.enqueue(encoder.encode(`0:${JSON.stringify(event.delta.text)}\n`))
                 }
-              } catch {
-                // Skip malformed events
+                if (event.delta?.type === 'input_json_delta' && event.delta.partial_json) {
+                  currentToolInput += event.delta.partial_json
+                }
               }
+
+              if (event.type === 'content_block_stop' && currentToolName === 'create_task') {
+                // Execute the tool call — create a real task
+                try {
+                  const toolArgs = JSON.parse(currentToolInput)
+                  const taskId = generateId()
+
+                  await db.insert(tasks).values({
+                    id: taskId,
+                    userId: session.user!.id,
+                    prompt: toolArgs.prompt,
+                    repoUrl: toolArgs.repoUrl,
+                    selectedAgent: toolArgs.selectedAgent || 'orchestrate',
+                    status: 'pending',
+                    progress: 0,
+                    installDependencies: false,
+                    maxDuration: 300,
+                    keepAlive: false,
+                    enableBrowser: false,
+                  })
+
+                  controller.enqueue(
+                    encoder.encode(
+                      `0:${JSON.stringify(`\n\n✅ Task created! Agent **${toolArgs.selectedAgent}** is working on it.\n\n[View Task](/tasks/${taskId})\n\n`)}\n`,
+                    ),
+                  )
+                } catch (toolError) {
+                  controller.enqueue(
+                    encoder.encode(`0:${JSON.stringify('\n\n❌ Failed to create task. Please try again.\n\n')}\n`),
+                  )
+                }
+
+                currentToolName = ''
+                currentToolInput = ''
+              }
+            } catch {
+              // Skip malformed events
             }
           }
         }

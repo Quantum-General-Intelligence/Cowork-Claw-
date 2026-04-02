@@ -5,9 +5,45 @@ import { TaskLogger } from '@/lib/utils/task-logger'
 import { connectors, taskMessages } from '@/lib/db/schema'
 import { db } from '@/lib/db/client'
 import { eq } from 'drizzle-orm'
-import { generateId } from '@/lib/utils/id'
 
 type Connector = typeof connectors.$inferSelect
+
+/**
+ * Resolve provider/model from the selected model string.
+ * Pi uses "provider/model" format — e.g. "anthropic/claude-sonnet-4-5"
+ */
+function resolveProviderModel(selectedModel?: string): { provider: string; model: string; envVar: string } {
+  if (selectedModel) {
+    // Already in provider/model format
+    if (selectedModel.includes('/')) {
+      const [provider] = selectedModel.split('/')
+      const envMap: Record<string, string> = {
+        anthropic: 'ANTHROPIC_API_KEY',
+        openai: 'OPENAI_API_KEY',
+        google: 'GOOGLE_API_KEY',
+      }
+      return { provider, model: selectedModel, envVar: envMap[provider] || 'ANTHROPIC_API_KEY' }
+    }
+    // Bare model name — infer provider
+    if (
+      selectedModel.startsWith('claude') ||
+      selectedModel.startsWith('sonnet') ||
+      selectedModel.startsWith('opus') ||
+      selectedModel.startsWith('haiku')
+    ) {
+      return { provider: 'anthropic', model: `anthropic/${selectedModel}`, envVar: 'ANTHROPIC_API_KEY' }
+    }
+    if (selectedModel.startsWith('gpt') || selectedModel.startsWith('o1') || selectedModel.startsWith('o3')) {
+      return { provider: 'openai', model: `openai/${selectedModel}`, envVar: 'OPENAI_API_KEY' }
+    }
+    if (selectedModel.startsWith('gemini')) {
+      return { provider: 'google', model: `google/${selectedModel}`, envVar: 'GOOGLE_API_KEY' }
+    }
+  }
+
+  // Default: Anthropic
+  return { provider: 'anthropic', model: 'anthropic/claude-sonnet-4-5', envVar: 'ANTHROPIC_API_KEY' }
+}
 
 export async function executePiInSandbox(
   sandbox: Sandbox,
@@ -36,29 +72,35 @@ export async function executePiInSandbox(
         changesDetected: false,
       }
     }
+
+    // Verify binary exists
+    const verifyCheck = await runCommandInSandbox(sandbox, 'which', ['pi'])
+    if (!verifyCheck.success) {
+      await logger.error('Pi binary not found after installation')
+      return {
+        success: false,
+        error: 'Pi binary not found after installation',
+        cliName: 'pi',
+        changesDetected: false,
+      }
+    }
+
     await logger.info('Pi coding agent installed successfully')
   } else {
     await logger.info('Pi coding agent already installed')
   }
 
-  // Step 2: Configure API key
-  const apiKey = process.env.ANTHROPIC_API_KEY || process.env.AI_GATEWAY_API_KEY || process.env.OPENAI_API_KEY
+  // Step 2: Resolve model and configure API key
+  const { model, envVar } = resolveProviderModel(selectedModel)
+  const apiKey = process.env[envVar] || process.env.ANTHROPIC_API_KEY || process.env.AI_GATEWAY_API_KEY
+
   if (!apiKey) {
     return {
       success: false,
-      error: 'No API key available for Pi agent (needs ANTHROPIC_API_KEY, AI_GATEWAY_API_KEY, or OPENAI_API_KEY)',
+      error: `No API key available for Pi agent (needs ${envVar})`,
       cliName: 'pi',
       changesDetected: false,
     }
-  }
-
-  // Determine provider and model
-  let provider = 'anthropic'
-  let model = selectedModel || 'claude-sonnet-4-5'
-
-  if (process.env.OPENAI_API_KEY && !process.env.ANTHROPIC_API_KEY) {
-    provider = 'openai'
-    model = selectedModel || 'gpt-5'
   }
 
   // Step 3: Create agent message for streaming updates
@@ -77,30 +119,38 @@ export async function executePiInSandbox(
 
   await logger.info('Running Pi coding agent...')
 
-  // Step 4: Build command
-  // Pi in print mode (-p) runs headless and exits after completion
-  const envVars = [`ANTHROPIC_API_KEY="${apiKey}"`]
-  if (process.env.OPENAI_API_KEY) {
-    envVars.push(`OPENAI_API_KEY="${process.env.OPENAI_API_KEY}"`)
-  }
-  if (process.env.GEMINI_API_KEY) {
-    envVars.push(`GOOGLE_API_KEY="${process.env.GEMINI_API_KEY}"`)
+  // Step 4: Build environment variables
+  const envVars: string[] = []
+  if (process.env.ANTHROPIC_API_KEY) envVars.push(`ANTHROPIC_API_KEY="${process.env.ANTHROPIC_API_KEY}"`)
+  if (process.env.OPENAI_API_KEY) envVars.push(`OPENAI_API_KEY="${process.env.OPENAI_API_KEY}"`)
+  if (process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY) {
+    envVars.push(`GOOGLE_API_KEY="${process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY}"`)
   }
 
-  // Escape the instruction for shell
-  const escapedInstruction = instruction.replace(/'/g, "'\\''")
+  // Write prompt to file to avoid shell escaping issues
+  await runCommandInSandbox(sandbox, 'sh', ['-c', `cat > /tmp/pi-prompt.txt << 'PIEOF'\n${instruction}\nPIEOF`])
 
-  // Resume session if available
-  const resumeFlag = isResumed && sessionId ? ` -c --session '${sessionId}'` : ''
+  // Build pi command
+  // --print (-p): non-interactive, process prompt and exit
+  // --model: provider/model format
+  // --no-session: don't persist session
+  // --continue (-c) + --session: resume previous session
+  const flags: string[] = ['-p', '--model', model, '--no-session']
 
-  const piCommand = `${envVars.join(' ')} pi -p --model ${provider}/${model} --no-session${resumeFlag} '${escapedInstruction}'`
+  if (isResumed && sessionId) {
+    // Override --no-session with resume
+    flags.splice(flags.indexOf('--no-session'), 1)
+    flags.push('-c', '--session', sessionId)
+  }
+
+  const piCommand = `${envVars.join(' ')} pi ${flags.join(' ')} "$(cat /tmp/pi-prompt.txt)"`
 
   const result = await runInProject(sandbox, 'sh', ['-c', piCommand])
 
-  if (!result.success) {
-    await logger.error('Pi agent execution failed')
+  const agentOutput = result.output || ''
 
-    // Update message with error
+  if (!result.success && !agentOutput) {
+    await logger.error('Pi agent execution failed')
     if (taskId && agentMessageId) {
       try {
         await db
@@ -111,7 +161,6 @@ export async function executePiInSandbox(
         // Ignore
       }
     }
-
     return {
       success: false,
       error: result.error || 'Pi agent execution failed',
@@ -119,8 +168,6 @@ export async function executePiInSandbox(
       changesDetected: false,
     }
   }
-
-  const agentOutput = result.output || ''
 
   // Update the agent message with the response
   if (taskId && agentMessageId && agentOutput) {
@@ -131,6 +178,8 @@ export async function executePiInSandbox(
     }
   }
 
+  // Consider success if we got output, even if exit code was non-zero
+  // (Pi may exit with code 1 after making changes)
   await logger.success('Pi agent execution completed')
 
   // Check for git changes

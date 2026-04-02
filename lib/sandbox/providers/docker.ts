@@ -22,22 +22,32 @@ function getSSHConfig() {
   return { host, port, username, privateKey }
 }
 
-async function sshExec(command: string): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+async function sshExec(
+  command: string,
+  timeoutMs: number = 30000,
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const { Client } = await import('ssh2')
+
   return new Promise((resolve, reject) => {
     const conn = new Client()
     let stdoutBuf = ''
     let stderrBuf = ''
+    const timer = setTimeout(() => {
+      conn.end()
+      reject(new Error(`SSH command timed out after ${timeoutMs}ms`))
+    }, timeoutMs)
 
     conn
       .on('ready', () => {
         conn.exec(command, (err, stream) => {
           if (err) {
+            clearTimeout(timer)
             conn.end()
             return reject(err)
           }
           stream
             .on('close', (code: number) => {
+              clearTimeout(timer)
               conn.end()
               resolve({ exitCode: code ?? 0, stdout: stdoutBuf, stderr: stderrBuf })
             })
@@ -49,9 +59,32 @@ async function sshExec(command: string): Promise<{ exitCode: number; stdout: str
             })
         })
       })
-      .on('error', reject)
+      .on('error', (err) => {
+        clearTimeout(timer)
+        reject(err)
+      })
       .connect(getSSHConfig())
   })
+}
+
+/** Retry SSH execution with exponential backoff */
+async function sshExecRetry(
+  command: string,
+  maxRetries: number = 3,
+  timeoutMs: number = 30000,
+): Promise<{ exitCode: number; stdout: string; stderr: string }> {
+  let lastError: Error | undefined
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await sshExec(command, timeoutMs)
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      if (i < maxRetries - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 1000 * (i + 1)))
+      }
+    }
+  }
+  throw lastError
 }
 
 class DockerSandboxInstance implements SandboxInstance {
@@ -70,6 +103,7 @@ class DockerSandboxInstance implements SandboxInstance {
   async runCommand(commandOrConfig: string | RunCommandConfig, args?: string[]): Promise<CommandResult> {
     let cmd: string
     let cwd: string | undefined
+    let env: Record<string, string> | undefined
 
     if (typeof commandOrConfig === 'string') {
       const escapedArgs = (args || []).map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ')
@@ -79,16 +113,27 @@ class DockerSandboxInstance implements SandboxInstance {
       const escapedArgs = (config.args || []).map((a) => `'${a.replace(/'/g, "'\\''")}'`).join(' ')
       cmd = escapedArgs ? `${config.cmd} ${escapedArgs}` : config.cmd
       cwd = config.cwd
+      env = config.env
 
       if (config.detached) {
-        cmd = `nohup ${cmd} > /dev/null 2>&1 &`
+        cmd = `nohup sh -c '${cmd.replace(/'/g, "'\\''")}' > /dev/null 2>&1 &`
       }
     }
 
-    const cwdPrefix = cwd ? `cd '${cwd}' && ` : ''
-    const dockerCmd = `docker exec ${this.containerName} sh -c '${cwdPrefix}${cmd.replace(/'/g, "'\\''")}'`
+    // Build env prefix
+    const envPrefix = env
+      ? Object.entries(env)
+          .map(([k, v]) => `${k}='${v.replace(/'/g, "'\\''")}'`)
+          .join(' ') + ' '
+      : ''
 
-    const result = await sshExec(dockerCmd)
+    const cwdPrefix = cwd ? `cd '${cwd}' && ` : ''
+    const fullCmd = `${cwdPrefix}${envPrefix}${cmd}`
+
+    // Use sh -c inside docker exec for proper shell interpretation
+    const dockerCmd = `docker exec ${this.containerName} sh -c '${fullCmd.replace(/'/g, "'\\''")}'`
+
+    const result = await sshExecRetry(dockerCmd, 2, 120000)
 
     return {
       exitCode: result.exitCode,
@@ -98,11 +143,21 @@ class DockerSandboxInstance implements SandboxInstance {
   }
 
   domain(port: number): string {
-    return `https://${this.containerName}.${this.sandboxDomain}`
+    // If SANDBOX_DOMAIN is set, use subdomain-based routing (requires Traefik/Caddy)
+    if (this.sandboxDomain && this.sandboxDomain !== 'localhost') {
+      return `https://${this.containerName}.${this.sandboxDomain}`
+    }
+    // Fallback: direct IP + mapped port
+    const host = process.env.SANDBOX_SSH_HOST || 'localhost'
+    return `http://${host}:${port}`
   }
 
   async stop(): Promise<void> {
-    await sshExec(`docker stop ${this.containerName} 2>/dev/null; docker rm ${this.containerName} 2>/dev/null`)
+    try {
+      await sshExecRetry(`docker stop ${this.containerName} 2>/dev/null; docker rm ${this.containerName} 2>/dev/null`)
+    } catch {
+      // Container may already be stopped/removed
+    }
   }
 }
 
@@ -112,13 +167,23 @@ export class DockerSandboxProvider implements SandboxProvider {
     const containerName = `sandbox-${id}`
     const image = config.runtime === 'node22' ? 'node:22' : `node:${config.runtime?.replace('node', '') || '22'}`
     const ports = config.ports || [3000]
+    const cpus = config.resources?.vcpus || 4
 
-    // Build port mapping flags
+    // Build port mapping: expose on random host ports to avoid conflicts
     const portFlags = ports.map((p) => `-p ${p}`).join(' ')
 
-    // Create container
-    const createCmd = `docker run -d --name ${containerName} ${portFlags} --memory=4g --cpus=${config.resources?.vcpus || 4} ${image} sleep infinity`
-    const createResult = await sshExec(createCmd)
+    // Create container with resource limits and git installed
+    const createCmd = [
+      `docker run -d --name ${containerName}`,
+      portFlags,
+      `--memory=4g --cpus=${cpus}`,
+      `--label cowork-claw=true`,
+      `--label sandbox-id=${id}`,
+      image,
+      `sh -c 'apt-get update -qq && apt-get install -y -qq git curl > /dev/null 2>&1; sleep infinity'`,
+    ].join(' ')
+
+    const createResult = await sshExecRetry(createCmd, 2, 60000)
 
     if (createResult.exitCode !== 0) {
       throw new Error(`Failed to create container: ${createResult.stderr}`)
@@ -126,22 +191,30 @@ export class DockerSandboxProvider implements SandboxProvider {
 
     const instance = new DockerSandboxInstance(id, ports)
 
+    // Wait for container to be ready (git installed)
+    for (let i = 0; i < 30; i++) {
+      const check = await sshExec(`docker exec ${containerName} which git 2>/dev/null`, 5000).catch(() => null)
+      if (check && check.exitCode === 0) break
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+    }
+
     // Create project directory
-    await instance.runCommand('mkdir', ['-p', '/vercel/sandbox/project'])
+    await sshExecRetry(`docker exec ${containerName} mkdir -p /vercel/sandbox/project`)
 
     // Clone repo if source provided
     if (config.source?.url) {
       const depthFlag = config.source.depth ? `--depth ${config.source.depth}` : ''
       const revisionFlag = config.source.revision ? `-b ${config.source.revision}` : ''
-      const cloneCmd = `git clone ${depthFlag} ${revisionFlag} '${config.source.url}' /vercel/sandbox/project`
-      await sshExec(`docker exec ${containerName} sh -c '${cloneCmd}'`)
+      const cloneCmd = `docker exec ${containerName} git clone ${depthFlag} ${revisionFlag} '${config.source.url}' /vercel/sandbox/project`
+      await sshExecRetry(cloneCmd, 2, 120000)
     }
 
-    // Set timeout to auto-stop container
+    // Set auto-cleanup timeout
     if (config.timeout) {
       const timeoutSec = Math.floor(config.timeout / 1000)
+      // Schedule cleanup in a detached background process
       await sshExec(
-        `(sleep ${timeoutSec} && docker stop ${containerName} 2>/dev/null && docker rm ${containerName} 2>/dev/null) &`,
+        `nohup sh -c 'sleep ${timeoutSec} && docker stop ${containerName} 2>/dev/null && docker rm ${containerName} 2>/dev/null' > /dev/null 2>&1 &`,
       )
     }
 
@@ -150,7 +223,13 @@ export class DockerSandboxProvider implements SandboxProvider {
 
   async get(options: SandboxGetOptions): Promise<SandboxInstance> {
     const containerName = `sandbox-${options.sandboxId}`
-    const result = await sshExec(`docker inspect ${containerName} --format '{{.State.Running}}'`)
+
+    // Check container exists and is running
+    const result = await sshExecRetry(
+      `docker inspect ${containerName} --format '{{.State.Running}}' 2>/dev/null`,
+      2,
+      10000,
+    )
 
     if (result.exitCode !== 0 || result.stdout.trim() !== 'true') {
       throw new Error(`Container ${containerName} not found or not running`)

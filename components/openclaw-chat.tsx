@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
 import { SharedHeader } from '@/components/shared-header'
-import { ArrowUp, Loader2, Sparkles, Settings } from 'lucide-react'
+import { ArrowUp, Loader2, Sparkles, Settings, ChevronDown } from 'lucide-react'
 import { Streamdown } from 'streamdown'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -99,7 +99,8 @@ export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }
         })
 
         if (!response.ok) {
-          throw new Error('Failed to send message')
+          const errorData = await response.json().catch(() => null)
+          throw new Error(errorData?.error || 'Failed to send message')
         }
 
         const reader = response.body?.getReader()
@@ -113,11 +114,9 @@ export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }
           if (done) break
 
           const chunk = decoder.decode(value, { stream: true })
-          // Parse AI SDK data stream format: lines starting with various prefixes
           const lines = chunk.split('\n')
           for (const line of lines) {
             if (line.startsWith('0:')) {
-              // Text delta — JSON-encoded string
               try {
                 const text = JSON.parse(line.slice(2))
                 accumulated += text
@@ -133,12 +132,12 @@ export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }
           }
         }
       } catch (error) {
-        console.error('Chat error:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Something went wrong'
         setMessages((prev) => {
           const updated = [...prev]
           updated[updated.length - 1] = {
             ...updated[updated.length - 1],
-            content: 'Sorry, something went wrong. Please try again.',
+            content: `Sorry, ${errorMessage}. Please try again.`,
           }
           return updated
         })
@@ -248,7 +247,7 @@ export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }
                                 </code>
                               ),
                               pre: ({ children, ...props }: React.ComponentPropsWithoutRef<'pre'>) => (
-                                <pre className="!text-sm bg-muted rounded-md p-3 overflow-x-auto" {...props}>
+                                <pre className="!text-sm bg-muted rounded-md p-3 overflow-x-auto my-2" {...props}>
                                   {children}
                                 </pre>
                               ),
@@ -275,9 +274,9 @@ export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }
                               a: ({ children, href, ...props }: React.ComponentPropsWithoutRef<'a'>) => (
                                 <a
                                   href={href}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-primary hover:underline"
+                                  target={href?.startsWith('/') ? undefined : '_blank'}
+                                  rel={href?.startsWith('/') ? undefined : 'noopener noreferrer'}
+                                  className="text-primary hover:underline font-medium"
                                   {...props}
                                 >
                                   {children}
@@ -311,9 +310,9 @@ export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }
         {!isAtBottom && messages.length > 0 && (
           <button
             onClick={scrollToBottom}
-            className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-background border border-border rounded-full px-3 py-1.5 text-xs text-muted-foreground shadow-md hover:bg-accent transition-colors z-10"
+            className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-background border border-border rounded-full p-2 shadow-md hover:bg-accent transition-colors z-10"
           >
-            Scroll to bottom
+            <ChevronDown className="h-4 w-4" />
           </button>
         )}
       </div>
@@ -350,7 +349,7 @@ export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }
             </Card>
           </form>
           <p className="text-[10px] text-muted-foreground text-center mt-1.5">
-            OpenClaw coordinates Claude, Codex, Copilot, Cursor, Gemini &amp; OpenCode to accomplish your tasks
+            OpenClaw coordinates Claude, Codex, Copilot, Cursor, Gemini, Pi &amp; more to accomplish your tasks
           </p>
         </div>
       </div>
