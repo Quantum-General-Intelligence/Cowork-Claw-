@@ -5,7 +5,7 @@ import { tasks, taskMessages, connectors } from '@/lib/db/schema'
 import { eq, and, asc, isNull } from 'drizzle-orm'
 import { generateId } from '@/lib/utils/id'
 import { createTaskLogger } from '@/lib/utils/task-logger'
-import { Sandbox } from '@vercel/sandbox'
+import { getSandboxProvider } from '@/lib/sandbox/factory'
 import { createSandbox } from '@/lib/sandbox/creation'
 import { executeAgentInSandbox, AgentType } from '@/lib/sandbox/agents'
 import { pushChangesToBranch, shutdownSandbox } from '@/lib/sandbox/git'
@@ -142,7 +142,7 @@ async function continueTask(
   keepAlive: boolean = false,
   enableBrowser: boolean = false,
 ) {
-  let sandbox: Sandbox | null = null
+  let sandbox: import('@/lib/sandbox/provider').SandboxInstance | null = null
   let isResumedSandbox = false // Track if we reconnected to existing sandbox
   const logger = createTaskLogger(taskId)
 
@@ -174,7 +174,7 @@ async function continueTask(
       try {
         await logger.info('Attempting to reconnect to existing sandbox')
         console.log('Calling Sandbox.get with sandboxId:', currentTask.sandboxId)
-        const reconnectedSandbox = await Sandbox.get({
+        const reconnectedSandbox = await getSandboxProvider().get({
           sandboxId: currentTask.sandboxId,
           teamId: process.env.SANDBOX_VERCEL_TEAM_ID!,
           projectId: process.env.SANDBOX_VERCEL_PROJECT_ID!,

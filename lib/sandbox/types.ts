@@ -1,4 +1,4 @@
-import { Sandbox } from '@vercel/sandbox'
+import type { SandboxInstance as Sandbox } from './provider'
 import { LogEntry } from '@/lib/db/schema'
 
 export interface SandboxConfig {

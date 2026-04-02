@@ -52,8 +52,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           return NextResponse.json({ error: 'Sandbox credentials not configured' }, { status: 500 })
         }
 
-        const { Sandbox } = await import('@vercel/sandbox')
-        sandbox = await Sandbox.get({
+        const { getSandboxProvider } = await import('@/lib/sandbox/factory')
+        sandbox = await getSandboxProvider().get({
           sandboxId: task.sandboxId,
           teamId,
           projectId,

@@ -4,7 +4,7 @@ import { tasks } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { getServerSession } from '@/lib/session/get-server-session'
 import { mergePullRequest } from '@/lib/github/client'
-import { Sandbox } from '@vercel/sandbox'
+import { getSandboxProvider } from '@/lib/sandbox/factory'
 import { unregisterSandbox } from '@/lib/sandbox/sandbox-registry'
 
 interface RouteParams {
@@ -56,7 +56,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Stop the sandbox if it exists
     if (task.sandboxId) {
       try {
-        const sandbox = await Sandbox.get({
+        const sandbox = await getSandboxProvider().get({
           sandboxId: task.sandboxId,
           teamId: process.env.SANDBOX_VERCEL_TEAM_ID!,
           projectId: process.env.SANDBOX_VERCEL_PROJECT_ID!,

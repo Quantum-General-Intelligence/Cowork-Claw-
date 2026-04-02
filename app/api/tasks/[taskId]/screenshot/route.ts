@@ -70,7 +70,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     // Connect to sandbox and read the file as base64
     const { getSandbox } = await import('@/lib/sandbox/sandbox-registry')
-    const { Sandbox } = await import('@vercel/sandbox')
+    const { getSandboxProvider } = await import('@/lib/sandbox/factory')
 
     let sandbox = getSandbox(taskId)
 
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const projectId = process.env.SANDBOX_VERCEL_PROJECT_ID
 
       if (sandboxToken && teamId && projectId) {
-        sandbox = await Sandbox.get({
+        sandbox = await getSandboxProvider().get({
           sandboxId: task.sandboxId,
           teamId,
           projectId,

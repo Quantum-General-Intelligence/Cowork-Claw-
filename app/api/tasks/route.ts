@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from 'next/server'
-import { Sandbox } from '@vercel/sandbox'
+import { getSandboxProvider } from '@/lib/sandbox/factory'
 import { db } from '@/lib/db/client'
 import { tasks, insertTaskSchema, connectors, taskMessages } from '@/lib/db/schema'
 import { generateId } from '@/lib/utils/id'
@@ -387,7 +387,7 @@ async function processTask(
     email: string | null
   } | null,
 ) {
-  let sandbox: Sandbox | null = null
+  let sandbox: import('@/lib/sandbox/provider').SandboxInstance | null = null
   const logger = createTaskLogger(taskId)
   const taskStartTime = Date.now()
 

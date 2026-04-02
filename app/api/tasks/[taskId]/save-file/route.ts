@@ -4,7 +4,7 @@ import { tasks } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { getServerSession } from '@/lib/session/get-server-session'
 import { getSandbox } from '@/lib/sandbox/sandbox-registry'
-import { Sandbox } from '@vercel/sandbox'
+import { getSandboxProvider } from '@/lib/sandbox/factory'
 import { PROJECT_DIR } from '@/lib/sandbox/commands'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ taskId: string }> }) {
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           return NextResponse.json({ error: 'Sandbox credentials not configured' }, { status: 500 })
         }
 
-        sandbox = await Sandbox.get({
+        sandbox = await getSandboxProvider().get({
           sandboxId: task.sandboxId,
           teamId,
           projectId,

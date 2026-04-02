@@ -1,6 +1,9 @@
-import { Sandbox } from '@vercel/sandbox'
+import type { SandboxInstance } from './provider'
+import { getSandboxProvider } from './factory'
 import { Writable } from 'stream'
 import { validateEnvironmentVariables, createAuthenticatedRepoUrl } from './config'
+
+type Sandbox = SandboxInstance
 import { runCommandInSandbox, runInProject, PROJECT_DIR } from './commands'
 import { generateId } from '@/lib/utils/id'
 import { SandboxConfig, SandboxResult } from './types'
@@ -96,7 +99,8 @@ export async function createSandbox(config: SandboxConfig, logger: TaskLogger): 
 
     let sandbox: Sandbox
     try {
-      sandbox = await Sandbox.create(sandboxConfig)
+      const provider = getSandboxProvider()
+      sandbox = await provider.create(sandboxConfig)
       await logger.info('Sandbox created successfully')
 
       // Register the sandbox immediately for potential killing

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
 import { tasks } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { Sandbox } from '@vercel/sandbox'
+import { getSandboxProvider } from '@/lib/sandbox/factory'
 import { getServerSession } from '@/lib/session/get-server-session'
 import { runCommandInSandbox, runInProject, PROJECT_DIR } from '@/lib/sandbox/commands'
 import { detectPackageManager } from '@/lib/sandbox/package-manager'
@@ -35,7 +35,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     }
 
     // Reconnect to the sandbox
-    const sandbox = await Sandbox.get({
+    const sandbox = await getSandboxProvider().get({
       sandboxId: task.sandboxId,
       teamId: process.env.SANDBOX_VERCEL_TEAM_ID!,
       projectId: process.env.SANDBOX_VERCEL_PROJECT_ID!,

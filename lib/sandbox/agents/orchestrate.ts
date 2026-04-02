@@ -1,4 +1,4 @@
-import { Sandbox } from '@vercel/sandbox'
+import type { SandboxInstance as Sandbox } from '../provider'
 import { AgentExecutionResult } from '../types'
 import { TaskLogger } from '@/lib/utils/task-logger'
 import { connectors, taskMessages } from '@/lib/db/schema'

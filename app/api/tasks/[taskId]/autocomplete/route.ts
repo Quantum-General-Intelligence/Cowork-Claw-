@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
 import * as schema from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
-import { Sandbox } from '@vercel/sandbox'
+import { getSandboxProvider } from '@/lib/sandbox/factory'
 import { getSandbox } from '@/lib/sandbox/sandbox-registry'
 import { getServerSession } from '@/lib/session/get-server-session'
 
@@ -52,7 +52,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           return NextResponse.json({ success: false, error: 'Sandbox credentials not configured' }, { status: 500 })
         }
 
-        sandbox = await Sandbox.get({
+        sandbox = await getSandboxProvider().get({
           sandboxId: task.sandboxId,
           teamId,
           projectId,

@@ -1,4 +1,4 @@
-import { Sandbox } from '@vercel/sandbox'
+import type { SandboxInstance as Sandbox } from './provider'
 
 /**
  * Simplified sandbox registry since we now use Sandbox.get() to reconnect
