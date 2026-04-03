@@ -213,24 +213,28 @@ export async function POST(req: NextRequest) {
                     enableBrowser: false,
                   })
 
-                  // Trigger async task execution via self-fetch to the start-sandbox endpoint
-                  // processTaskWithTimeout is local to tasks/route.ts so we trigger via API
+                  // Trigger async task execution directly via shared executor
                   after(async () => {
                     try {
-                      const baseUrl = process.env.VERCEL_URL
-                        ? `https://${process.env.VERCEL_URL}`
-                        : process.env.NEXTAUTH_URL || 'http://localhost:3000'
-
-                      // Trigger task execution by calling the internal start endpoint
-                      await fetch(`${baseUrl}/api/tasks/${taskId}/start-sandbox`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                      }).catch(() => {
-                        // If internal fetch fails, task stays pending
-                        // User can manually trigger from the task page
-                      })
-                    } catch {
-                      // Task stays pending — user can trigger from task page
+                      const { processTaskWithTimeout } = await import('@/lib/tasks/executor')
+                      await processTaskWithTimeout(
+                        taskId,
+                        toolArgs.prompt,
+                        toolArgs.repoUrl,
+                        taskContext.maxDuration,
+                        toolArgs.selectedAgent || 'orchestrate',
+                        undefined,
+                        false,
+                        false,
+                        false,
+                        {
+                          apiKeys: taskContext.apiKeys,
+                          githubToken: taskContext.githubToken,
+                          githubUser: taskContext.githubUser,
+                        },
+                      )
+                    } catch (execError) {
+                      console.error('Task execution failed:', execError)
                     }
                   })
 
