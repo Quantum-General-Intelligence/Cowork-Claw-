@@ -468,3 +468,35 @@ export const conversationMessages = pgTable('conversation_messages', {
 })
 
 export type ConversationMessage = typeof conversationMessages.$inferSelect
+
+// Workflows table — visual agent orchestration plans
+export const workflows = pgTable('workflows', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull().default('Untitled Workflow'),
+  description: text('description'),
+  nodes: jsonb('nodes').$type<unknown[]>().default([]),
+  edges: jsonb('edges').$type<unknown[]>().default([]),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export type Workflow = typeof workflows.$inferSelect
+
+// Workflow executions — history of workflow runs
+export const workflowExecutions = pgTable('workflow_executions', {
+  id: text('id').primaryKey(),
+  workflowId: text('workflow_id')
+    .notNull()
+    .references(() => workflows.id, { onDelete: 'cascade' }),
+  status: text('status', { enum: ['pending', 'running', 'completed', 'error'] })
+    .notNull()
+    .default('pending'),
+  error: text('error'),
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+  completedAt: timestamp('completed_at'),
+})
+
+export type WorkflowExecution = typeof workflowExecutions.$inferSelect
