@@ -67,6 +67,7 @@
     "sonner": "^2.0.7",
     "ssh2": "^1.17.0",
     "streamdown": "^1.6.11",
+    "stripe": "^22.0.0",
     "tailwind-merge": "^3.4.0",
     "typescript-language-server": "^5.1.3",
     "vaul": "^1.1.2",

@@ -593,3 +593,41 @@ export const notifications = pgTable('notifications', {
 })
 
 export type Notification = typeof notifications.$inferSelect
+
+// Usage meters — daily aggregate per user
+export const usageMeters = pgTable(
+  'usage_meters',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(), // YYYY-MM-DD format
+    apiCalls: integer('api_calls').default(0),
+    sandboxMinutes: integer('sandbox_minutes').default(0),
+    sandboxCount: integer('sandbox_count').default(0),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('usage_meters_user_date_idx').on(table.userId, table.date)],
+)
+
+export type UsageMeter = typeof usageMeters.$inferSelect
+
+// Subscriptions — billing plan per user
+export const subscriptions = pgTable('subscriptions', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  planId: text('plan_id').notNull().default('free'), // free, pro, enterprise
+  status: text('status').notNull().default('active'), // active, past_due, canceled
+  stripeCustomerId: text('stripe_customer_id'),
+  stripeSubscriptionId: text('stripe_subscription_id'),
+  currentPeriodStart: timestamp('current_period_start'),
+  currentPeriodEnd: timestamp('current_period_end'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export type Subscription = typeof subscriptions.$inferSelect
