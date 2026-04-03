@@ -7,6 +7,7 @@ import { User } from '@/components/auth/user'
 import { GitHubStarsButton } from '@/components/github-stars-button'
 import { VERCEL_DEPLOY_URL } from '@/lib/constants'
 import { WorkspaceSwitcher } from '@/components/workspace-switcher'
+import { NotificationsDropdown } from '@/components/notifications-dropdown'
 
 interface SharedHeaderProps {
   leftActions?: React.ReactNode
@@ -63,6 +64,8 @@ export function SharedHeader({
           )}
 
           {extraActions}
+
+          <NotificationsDropdown />
 
           <User />
         </div>

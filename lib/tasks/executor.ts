@@ -1,5 +1,6 @@
 import { db } from '@/lib/db/client'
 import { tasks, connectors, taskMessages } from '@/lib/db/schema'
+import { emitActivity } from '@/lib/activity/emit'
 import { generateId } from '@/lib/utils/id'
 import { createSandbox } from '@/lib/sandbox/creation'
 import { executeAgentInSandbox, AgentType } from '@/lib/sandbox/agents'
@@ -387,6 +388,15 @@ async function processTask(
       } else {
         await logger.updateStatus('completed')
         await logger.updateProgress(100, 'Task completed successfully')
+
+        // Emit activity event
+        const [completedTask] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1)
+        if (completedTask) {
+          await emitActivity(completedTask.userId, 'task_completed', 'task', taskId, {
+            agent: selectedAgent,
+            prompt: prompt.slice(0, 200),
+          })
+        }
       }
     } else {
       await logger.error('Agent execution failed')
@@ -414,5 +424,11 @@ async function processTask(
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     await logger.error('Error occurred during task processing')
     await logger.updateStatus('error', errorMessage)
+
+    // Emit error activity
+    const [failedTask] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1)
+    if (failedTask) {
+      await emitActivity(failedTask.userId, 'task_error', 'task', taskId, { error: errorMessage })
+    }
   }
 }

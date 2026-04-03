@@ -558,3 +558,38 @@ export const workspaceInvites = pgTable('workspace_invites', {
 })
 
 export type WorkspaceInvite = typeof workspaceInvites.$inferSelect
+
+// Activity events — immutable audit trail
+export const activityEvents = pgTable('activity_events', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  workspaceId: text('workspace_id').references(() => workspaces.id, { onDelete: 'cascade' }),
+  eventType: text('event_type').notNull(), // task_created, task_completed, task_error, pr_created, pr_merged, member_joined
+  entityType: text('entity_type'), // task, pr, workspace, member
+  entityId: text('entity_id'),
+  actorId: text('actor_id').references(() => users.id, { onDelete: 'set null' }),
+  data: jsonb('data').$type<Record<string, unknown>>(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export type ActivityEvent = typeof activityEvents.$inferSelect
+
+// Notifications — per-user delivery queue
+export const notifications = pgTable('notifications', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  type: text('type').notNull(), // task_complete, task_error, pr_created, pr_merged, member_invited
+  title: text('title').notNull(),
+  message: text('message'),
+  actionUrl: text('action_url'),
+  relatedEntityType: text('related_entity_type'),
+  relatedEntityId: text('related_entity_id'),
+  readAt: timestamp('read_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export type Notification = typeof notifications.$inferSelect
