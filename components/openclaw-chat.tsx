@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Card } from '@/components/ui/card'
@@ -38,9 +39,34 @@ function generateMessageId() {
 }
 
 export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }: OpenClawChatProps) {
+  const searchParams = useSearchParams()
+  const [conversationId, setConversationId] = useState<string | null>(searchParams.get('conversation'))
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [isStreaming, setIsStreaming] = useState(false)
+
+  // Load existing conversation on mount
+  useEffect(() => {
+    if (conversationId && messages.length === 0) {
+      fetch(`/api/conversations/${conversationId}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.messages) {
+            setMessages(
+              data.messages.map((m: { id: string; role: string; content: string }) => ({
+                id: m.id,
+                role: m.role === 'assistant' ? 'assistant' : 'user',
+                content: m.content,
+              })),
+            )
+          }
+        })
+        .catch(() => {
+          // Conversation not found, start fresh
+          setConversationId(null)
+        })
+    }
+  }, [conversationId]) // eslint-disable-line react-hooks/exhaustive-deps
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const messagesContainerRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -95,6 +121,7 @@ export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             messages: updatedMessages.map((m) => ({ role: m.role, content: m.content })),
+            conversationId,
           }),
         })
 
@@ -116,7 +143,19 @@ export function OpenClawChat({ user, initialStars, selectedOwner, selectedRepo }
           const chunk = decoder.decode(value, { stream: true })
           const lines = chunk.split('\n')
           for (const line of lines) {
-            if (line.startsWith('0:')) {
+            if (line.startsWith('e:')) {
+              // Metadata line — contains conversationId
+              try {
+                const meta = JSON.parse(line.slice(2))
+                if (meta.conversationId && !conversationId) {
+                  setConversationId(meta.conversationId)
+                  // Update URL without reload
+                  window.history.replaceState(null, '', `/?conversation=${meta.conversationId}`)
+                }
+              } catch {
+                // Skip
+              }
+            } else if (line.startsWith('0:')) {
               try {
                 const text = JSON.parse(line.slice(2))
                 accumulated += text

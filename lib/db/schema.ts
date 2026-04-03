@@ -434,3 +434,37 @@ export type InsertSetting = z.infer<typeof insertSettingSchema>
 export const userConnections = accounts
 export type UserConnection = Account
 export type InsertUserConnection = InsertAccount
+
+// Conversations table — persistent chat sessions with OpenClaw
+export const conversations = pgTable('conversations', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export const insertConversationSchema = z.object({
+  id: z.string().optional(),
+  userId: z.string().min(1),
+  title: z.string().optional(),
+})
+
+export type Conversation = typeof conversations.$inferSelect
+export type InsertConversation = z.infer<typeof insertConversationSchema>
+
+// Conversation messages — individual turns in a conversation
+export const conversationMessages = pgTable('conversation_messages', {
+  id: text('id').primaryKey(),
+  conversationId: text('conversation_id')
+    .notNull()
+    .references(() => conversations.id, { onDelete: 'cascade' }),
+  role: text('role', { enum: ['user', 'assistant'] }).notNull(),
+  content: text('content').notNull(),
+  taskId: text('task_id').references(() => tasks.id, { onDelete: 'set null' }), // Links to task if one was created from this message
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export type ConversationMessage = typeof conversationMessages.$inferSelect

@@ -1,8 +1,9 @@
 import { NextRequest, after } from 'next/server'
 import { getServerSession } from '@/lib/session/get-server-session'
 import { db } from '@/lib/db/client'
-import { tasks } from '@/lib/db/schema'
+import { tasks, conversations, conversationMessages } from '@/lib/db/schema'
 import { generateId } from '@/lib/utils/id'
+import { eq } from 'drizzle-orm'
 import { checkRateLimit } from '@/lib/utils/rate-limit'
 import { getUserApiKeys } from '@/lib/api-keys/user-keys'
 import { getUserGitHubToken } from '@/lib/github/user-token'
@@ -64,7 +65,35 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  const { messages } = await req.json()
+  const { messages, conversationId: existingConversationId } = await req.json()
+
+  // Get or create conversation for persistence
+  let conversationId = existingConversationId
+  if (!conversationId) {
+    const [conv] = await db
+      .insert(conversations)
+      .values({
+        id: generateId(12),
+        userId: session.user.id,
+        title: messages[messages.length - 1]?.content?.slice(0, 100) || 'New conversation',
+      })
+      .returning()
+    conversationId = conv.id
+  } else {
+    // Update conversation timestamp
+    await db.update(conversations).set({ updatedAt: new Date() }).where(eq(conversations.id, conversationId))
+  }
+
+  // Save user message
+  const lastUserMessage = messages[messages.length - 1]
+  if (lastUserMessage?.role === 'user') {
+    await db.insert(conversationMessages).values({
+      id: generateId(12),
+      conversationId,
+      role: 'user',
+      content: lastUserMessage.content,
+    })
+  }
 
   // Determine API endpoint and key
   const aiGatewayKey = process.env.AI_GATEWAY_API_KEY
@@ -155,6 +184,7 @@ export async function POST(req: NextRequest) {
       let currentToolInput = ''
       let toolUseId = ''
       let hasToolCall = false
+      let fullAssistantResponse = '' // Accumulate for DB persistence
 
       try {
         while (true) {
@@ -184,6 +214,7 @@ export async function POST(req: NextRequest) {
 
               if (event.type === 'content_block_delta') {
                 if (event.delta?.type === 'text_delta' && event.delta.text) {
+                  fullAssistantResponse += event.delta.text
                   controller.enqueue(encoder.encode(`0:${JSON.stringify(event.delta.text)}\n`))
                 }
                 if (event.delta?.type === 'input_json_delta' && event.delta.partial_json) {
@@ -339,6 +370,21 @@ export async function POST(req: NextRequest) {
       } catch (error) {
         console.error('Stream error:', error)
       } finally {
+        // Persist assistant response to conversation
+        if (fullAssistantResponse && conversationId) {
+          try {
+            await db.insert(conversationMessages).values({
+              id: generateId(12),
+              conversationId,
+              role: 'assistant',
+              content: fullAssistantResponse,
+            })
+          } catch {
+            // Don't fail the stream if DB persistence fails
+          }
+        }
+        // Send conversationId as final metadata so client can track it
+        controller.enqueue(encoder.encode(`e:${JSON.stringify({ conversationId })}\n`))
         controller.close()
       }
     },
