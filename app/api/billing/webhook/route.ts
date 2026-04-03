@@ -38,8 +38,12 @@ export async function POST(req: NextRequest) {
               status: 'active',
               stripeCustomerId,
               stripeSubscriptionId,
-              currentPeriodStart: new Date((stripeSub as unknown as { current_period_start: number }).current_period_start * 1000),
-              currentPeriodEnd: new Date((stripeSub as unknown as { current_period_end: number }).current_period_end * 1000),
+              currentPeriodStart: new Date(
+                (stripeSub as unknown as { current_period_start: number }).current_period_start * 1000,
+              ),
+              currentPeriodEnd: new Date(
+                (stripeSub as unknown as { current_period_end: number }).current_period_end * 1000,
+              ),
             })
             .onConflictDoUpdate({
               target: subscriptions.id,
@@ -48,8 +52,12 @@ export async function POST(req: NextRequest) {
                 status: 'active',
                 stripeCustomerId,
                 stripeSubscriptionId,
-                currentPeriodStart: new Date((stripeSub as unknown as { current_period_start: number }).current_period_start * 1000),
-                currentPeriodEnd: new Date((stripeSub as unknown as { current_period_end: number }).current_period_end * 1000),
+                currentPeriodStart: new Date(
+                  (stripeSub as unknown as { current_period_start: number }).current_period_start * 1000,
+                ),
+                currentPeriodEnd: new Date(
+                  (stripeSub as unknown as { current_period_end: number }).current_period_end * 1000,
+                ),
                 updatedAt: new Date(),
               },
             })
@@ -63,7 +71,9 @@ export async function POST(req: NextRequest) {
           .update(subscriptions)
           .set({
             status: sub.status === 'active' ? 'active' : sub.status === 'past_due' ? 'past_due' : 'canceled',
-            currentPeriodStart: new Date((sub as unknown as { current_period_start: number }).current_period_start * 1000),
+            currentPeriodStart: new Date(
+              (sub as unknown as { current_period_start: number }).current_period_start * 1000,
+            ),
             currentPeriodEnd: new Date((sub as unknown as { current_period_end: number }).current_period_end * 1000),
             updatedAt: new Date(),
           })
