@@ -500,3 +500,61 @@ export const workflowExecutions = pgTable('workflow_executions', {
 })
 
 export type WorkflowExecution = typeof workflowExecutions.$inferSelect
+
+// Workspaces — collaborative team spaces
+export const workspaces = pgTable(
+  'workspaces',
+  {
+    id: text('id').primaryKey(),
+    name: text('name').notNull(),
+    slug: text('slug').notNull(),
+    ownerId: text('owner_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    description: text('description'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('workspaces_owner_slug_idx').on(table.ownerId, table.slug)],
+)
+
+export type Workspace = typeof workspaces.$inferSelect
+
+// Workspace members — who belongs to which workspace
+export const workspaceMembers = pgTable(
+  'workspace_members',
+  {
+    id: text('id').primaryKey(),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    role: text('role', { enum: ['owner', 'admin', 'member', 'viewer'] })
+      .notNull()
+      .default('member'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('workspace_members_ws_user_idx').on(table.workspaceId, table.userId)],
+)
+
+export type WorkspaceMember = typeof workspaceMembers.$inferSelect
+
+// Workspace invites — pending invitations
+export const workspaceInvites = pgTable('workspace_invites', {
+  id: text('id').primaryKey(),
+  workspaceId: text('workspace_id')
+    .notNull()
+    .references(() => workspaces.id, { onDelete: 'cascade' }),
+  email: text('email').notNull(),
+  role: text('role', { enum: ['admin', 'member', 'viewer'] })
+    .notNull()
+    .default('member'),
+  token: text('token').notNull(),
+  expiresAt: timestamp('expires_at').notNull(),
+  acceptedAt: timestamp('accepted_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export type WorkspaceInvite = typeof workspaceInvites.$inferSelect
