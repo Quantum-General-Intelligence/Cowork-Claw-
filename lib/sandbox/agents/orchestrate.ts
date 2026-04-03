@@ -155,7 +155,7 @@ export async function executeOrchestrateInSandbox(
     planPrompt,
     logger,
     undefined,
-    undefined,
+    mcpServers,
     false,
     undefined,
     taskId,

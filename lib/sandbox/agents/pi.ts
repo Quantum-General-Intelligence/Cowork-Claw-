@@ -135,13 +135,11 @@ export async function executePiInSandbox(
   // --model: provider/model format
   // --no-session: don't persist session
   // --continue (-c) + --session: resume previous session
-  const flags: string[] = ['-p', '--model', model, '--no-session']
-
-  if (isResumed && sessionId) {
-    // Override --no-session with resume
-    flags.splice(flags.indexOf('--no-session'), 1)
-    flags.push('-c', '--session', sessionId)
-  }
+  // Build flags: resumed sessions use -c, fresh runs use --no-session
+  const flags: string[] =
+    isResumed && sessionId
+      ? ['-p', '--model', model, '-c', '--session', sessionId]
+      : ['-p', '--model', model, '--no-session']
 
   const piCommand = `${envVars.join(' ')} pi ${flags.join(' ')} "$(cat /tmp/pi-prompt.txt)"`
 

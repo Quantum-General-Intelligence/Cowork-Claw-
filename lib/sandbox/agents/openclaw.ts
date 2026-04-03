@@ -250,6 +250,17 @@ export async function executeOpenClawInSandbox(
   taskId?: string,
   agentMessageId?: string,
 ): Promise<AgentExecutionResult> {
+  // Validate API key availability before doing anything
+  const apiKey = process.env.AI_GATEWAY_API_KEY || process.env.ANTHROPIC_API_KEY
+  if (!apiKey) {
+    return {
+      success: false,
+      error: 'No AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY configured. OpenClaw requires one of these to function.',
+      cliName: 'openclaw',
+      changesDetected: false,
+    }
+  }
+
   const gatewayToken = nanoid(32)
 
   // Step 1: Install OpenClaw

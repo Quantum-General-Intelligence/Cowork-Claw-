@@ -24,7 +24,7 @@ function getSSHConfig() {
 
 async function sshExec(
   command: string,
-  timeoutMs: number = 30000,
+  timeoutMs: number = 60000,
 ): Promise<{ exitCode: number; stdout: string; stderr: string }> {
   const { Client } = await import('ssh2')
 
@@ -193,7 +193,7 @@ export class DockerSandboxProvider implements SandboxProvider {
 
     // Wait for container to be ready (git installed)
     for (let i = 0; i < 30; i++) {
-      const check = await sshExec(`docker exec ${containerName} which git 2>/dev/null`, 5000).catch(() => null)
+      const check = await sshExec(`docker exec ${containerName} which git 2>/dev/null`, 15000).catch(() => null)
       if (check && check.exitCode === 0) break
       await new Promise((resolve) => setTimeout(resolve, 2000))
     }
