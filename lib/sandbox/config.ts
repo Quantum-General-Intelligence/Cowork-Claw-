@@ -28,6 +28,22 @@ export function validateEnvironmentVariables(
     errors.push('GEMINI_API_KEY is required for Gemini CLI. Please add your API key in your profile.')
   }
 
+  if (selectedAgent === 'openclaw' || selectedAgent === 'orchestrate') {
+    const hasAiGateway = apiKeys?.AI_GATEWAY_API_KEY || process.env.AI_GATEWAY_API_KEY
+    const hasAnthropic = apiKeys?.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY
+    if (!hasAiGateway && !hasAnthropic) {
+      errors.push('AI_GATEWAY_API_KEY or ANTHROPIC_API_KEY is required for OpenClaw/Orchestrate.')
+    }
+  }
+
+  if (selectedAgent === 'pi') {
+    const hasAnthropic = apiKeys?.ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY
+    const hasOpenAI = apiKeys?.OPENAI_API_KEY || process.env.OPENAI_API_KEY
+    if (!hasAnthropic && !hasOpenAI) {
+      errors.push('ANTHROPIC_API_KEY or OPENAI_API_KEY is required for Pi agent.')
+    }
+  }
+
   if (selectedAgent === 'opencode') {
     // OpenCode can use either AI Gateway (for GPT models) or Anthropic (for Claude models)
     // We require at least one to be present
@@ -47,17 +63,26 @@ export function validateEnvironmentVariables(
     errors.push('GitHub is required for repository access. Please connect your GitHub account.')
   }
 
-  // Check for Vercel sandbox environment variables
-  if (!process.env.SANDBOX_VERCEL_TEAM_ID) {
-    errors.push('SANDBOX_VERCEL_TEAM_ID is required for sandbox creation')
-  }
+  // Check for sandbox provider configuration
+  const sandboxProvider = process.env.SANDBOX_PROVIDER || (process.env.SANDBOX_SSH_HOST ? 'docker' : 'vercel')
 
-  if (!process.env.SANDBOX_VERCEL_PROJECT_ID) {
-    errors.push('SANDBOX_VERCEL_PROJECT_ID is required for sandbox creation')
-  }
-
-  if (!process.env.SANDBOX_VERCEL_TOKEN) {
-    errors.push('SANDBOX_VERCEL_TOKEN is required for sandbox creation')
+  if (sandboxProvider === 'docker') {
+    if (!process.env.SANDBOX_SSH_HOST) {
+      errors.push('SANDBOX_SSH_HOST is required for Docker sandbox provider')
+    }
+    if (!process.env.SANDBOX_SSH_KEY) {
+      errors.push('SANDBOX_SSH_KEY is required for Docker sandbox provider')
+    }
+  } else {
+    if (!process.env.SANDBOX_VERCEL_TEAM_ID) {
+      errors.push('SANDBOX_VERCEL_TEAM_ID is required for sandbox creation')
+    }
+    if (!process.env.SANDBOX_VERCEL_PROJECT_ID) {
+      errors.push('SANDBOX_VERCEL_PROJECT_ID is required for sandbox creation')
+    }
+    if (!process.env.SANDBOX_VERCEL_TOKEN) {
+      errors.push('SANDBOX_VERCEL_TOKEN is required for sandbox creation')
+    }
   }
 
   return {

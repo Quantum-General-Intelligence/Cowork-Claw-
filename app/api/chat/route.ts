@@ -1,9 +1,13 @@
-import { NextRequest } from 'next/server'
+import { NextRequest, after } from 'next/server'
 import { getServerSession } from '@/lib/session/get-server-session'
 import { db } from '@/lib/db/client'
-import { tasks, insertTaskSchema } from '@/lib/db/schema'
+import { tasks } from '@/lib/db/schema'
 import { generateId } from '@/lib/utils/id'
-import { eq } from 'drizzle-orm'
+import { checkRateLimit } from '@/lib/utils/rate-limit'
+import { getUserApiKeys } from '@/lib/api-keys/user-keys'
+import { getUserGitHubToken } from '@/lib/github/user-token'
+import { getGitHubUser } from '@/lib/github/client'
+import { getMaxSandboxDuration } from '@/lib/db/settings'
 
 const ORCHESTRATOR_SYSTEM_PROMPT = `You are OpenClaw, the AI orchestrator for the Cowork-Claw platform. You coordinate a team of AI coding agents to accomplish tasks for the user.
 
@@ -23,21 +27,41 @@ Available agents and their strengths:
 - **OpenCode**: Versatile open-source code generation supporting multiple model backends
 - **Pi**: Extensible coding agent framework with 15+ LLM providers and stateful sessions
 - **OpenClaw**: Full AI agent runtime with skills (web search, vision, worker-sandboxes)
+- **Orchestrate**: Auto-select the best agent(s) and coordinate multi-agent execution
 
-When the user wants to execute a task, you have a tool called "create_task" to dispatch it. Use it when:
-- The user has clearly described what they want done
-- You know which repository to work on
-- You've confirmed the approach with the user
-
-When responding about agent assignments, format them clearly:
-- **Agent**: task description
+When the user has clearly described a task AND confirmed they want to proceed, use the create_task tool.
+If the task is ambiguous, ask clarifying questions first.
+Always confirm the repository URL before creating a task.
 
 Keep responses focused and actionable. You are the user's AI team lead.`
+
+// Pre-fetch everything needed for task execution BEFORE the stream starts
+// This avoids losing request context inside after()
+async function prefetchTaskContext(userId: string) {
+  const [apiKeys, githubToken, githubUser, maxDuration] = await Promise.all([
+    getUserApiKeys(),
+    getUserGitHubToken(),
+    getGitHubUser(),
+    getMaxSandboxDuration(userId),
+  ])
+  return { apiKeys, githubToken, githubUser, maxDuration }
+}
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession()
   if (!session?.user?.id) {
     return new Response('Unauthorized', { status: 401 })
+  }
+
+  // Rate limiting
+  const rateLimit = await checkRateLimit(session.user.id)
+  if (!rateLimit.allowed) {
+    return Response.json(
+      {
+        error: `Rate limit exceeded. ${rateLimit.remaining} of ${rateLimit.total} remaining. Resets at ${rateLimit.resetAt.toISOString()}`,
+      },
+      { status: 429 },
+    )
   }
 
   const { messages } = await req.json()
@@ -57,12 +81,15 @@ export async function POST(req: NextRequest) {
   const apiUrl = useGateway ? 'https://ai-gateway.vercel.sh/v1/messages' : 'https://api.anthropic.com/v1/messages'
   const apiKey = useGateway ? aiGatewayKey! : anthropicKey!
 
-  // Define the create_task tool for Anthropic API
+  // Pre-fetch task context while we still have request context
+  const taskContext = await prefetchTaskContext(session.user.id)
+
+  // Define the create_task tool
   const tools = [
     {
       name: 'create_task',
       description:
-        'Create a coding task that dispatches an AI agent to work on a repository. Use this when the user has confirmed what they want done.',
+        'Create and execute a coding task that dispatches an AI agent to work on a repository. The task will start executing immediately in a sandbox.',
       input_schema: {
         type: 'object' as const,
         properties: {
@@ -77,7 +104,7 @@ export async function POST(req: NextRequest) {
           selectedAgent: {
             type: 'string',
             enum: ['claude', 'codex', 'copilot', 'cursor', 'gemini', 'opencode', 'openclaw', 'orchestrate', 'pi'],
-            description: 'Which agent to assign the task to',
+            description: 'Which agent to assign. Use "orchestrate" for complex tasks needing multiple agents.',
           },
         },
         required: ['prompt', 'repoUrl', 'selectedAgent'],
@@ -85,7 +112,8 @@ export async function POST(req: NextRequest) {
     },
   ]
 
-  const response = await fetch(apiUrl, {
+  // First API call — get Claude's response (may include tool_use)
+  const firstResponse = await fetch(apiUrl, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -105,17 +133,17 @@ export async function POST(req: NextRequest) {
     }),
   })
 
-  if (!response.ok) {
-    const error = await response.text()
+  if (!firstResponse.ok) {
+    const error = await firstResponse.text()
     console.error('API error:', error)
-    return new Response('Failed to generate response', { status: 500 })
+    return Response.json({ error: 'Failed to generate response' }, { status: 500 })
   }
 
-  // Transform Anthropic SSE stream to our format, handling tool calls
+  // Process stream, handle tool calls, and produce final output
   const encoder = new TextEncoder()
   const readable = new ReadableStream({
     async start(controller) {
-      const reader = response.body?.getReader()
+      const reader = firstResponse.body?.getReader()
       if (!reader) {
         controller.close()
         return
@@ -125,6 +153,8 @@ export async function POST(req: NextRequest) {
       let buffer = ''
       let currentToolName = ''
       let currentToolInput = ''
+      let toolUseId = ''
+      let hasToolCall = false
 
       try {
         while (true) {
@@ -146,11 +176,9 @@ export async function POST(req: NextRequest) {
               if (event.type === 'content_block_start') {
                 if (event.content_block?.type === 'tool_use') {
                   currentToolName = event.content_block.name || ''
+                  toolUseId = event.content_block.id || ''
                   currentToolInput = ''
-                  // Send tool start indicator
-                  controller.enqueue(
-                    encoder.encode(`0:${JSON.stringify(`\n\n🔧 Dispatching task with ${currentToolName}...\n\n`)}\n`),
-                  )
+                  hasToolCall = true
                 }
               }
 
@@ -163,12 +191,14 @@ export async function POST(req: NextRequest) {
                 }
               }
 
-              if (event.type === 'content_block_stop' && currentToolName === 'create_task') {
-                // Execute the tool call — create a real task
+              if (event.type === 'content_block_stop' && currentToolName === 'create_task' && hasToolCall) {
+                // Execute the tool — create and trigger a real task
+                let toolResultContent = ''
                 try {
                   const toolArgs = JSON.parse(currentToolInput)
                   const taskId = generateId()
 
+                  // Insert task into DB with proper user settings
                   await db.insert(tasks).values({
                     id: taskId,
                     userId: session.user!.id,
@@ -178,24 +208,124 @@ export async function POST(req: NextRequest) {
                     status: 'pending',
                     progress: 0,
                     installDependencies: false,
-                    maxDuration: 300,
+                    maxDuration: taskContext.maxDuration,
                     keepAlive: false,
                     enableBrowser: false,
                   })
 
+                  // Trigger async task execution via self-fetch to the start-sandbox endpoint
+                  // processTaskWithTimeout is local to tasks/route.ts so we trigger via API
+                  after(async () => {
+                    try {
+                      const baseUrl = process.env.VERCEL_URL
+                        ? `https://${process.env.VERCEL_URL}`
+                        : process.env.NEXTAUTH_URL || 'http://localhost:3000'
+
+                      // Trigger task execution by calling the internal start endpoint
+                      await fetch(`${baseUrl}/api/tasks/${taskId}/start-sandbox`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                      }).catch(() => {
+                        // If internal fetch fails, task stays pending
+                        // User can manually trigger from the task page
+                      })
+                    } catch {
+                      // Task stays pending — user can trigger from task page
+                    }
+                  })
+
+                  toolResultContent = `Task created successfully. Task ID: ${taskId}. Agent: ${toolArgs.selectedAgent}. The agent is now working on the task.`
+
+                  // Stream task creation confirmation to user
                   controller.enqueue(
                     encoder.encode(
-                      `0:${JSON.stringify(`\n\n✅ Task created! Agent **${toolArgs.selectedAgent}** is working on it.\n\n[View Task](/tasks/${taskId})\n\n`)}\n`,
+                      `0:${JSON.stringify(`\n\n---\n\n**Task dispatched** to **${toolArgs.selectedAgent}**\n\n[View task progress](/tasks/${taskId})\n\n`)}\n`,
                     ),
                   )
                 } catch (toolError) {
+                  console.error('Task creation failed:', toolError)
+                  toolResultContent = `Failed to create task: ${toolError instanceof Error ? toolError.message : 'Unknown error'}`
                   controller.enqueue(
-                    encoder.encode(`0:${JSON.stringify('\n\n❌ Failed to create task. Please try again.\n\n')}\n`),
+                    encoder.encode(
+                      `0:${JSON.stringify('\n\n---\n\n**Failed to create task.** Please try again or use [Manual Mode](/new).\n\n')}\n`,
+                    ),
                   )
+                }
+
+                // Send tool_result back to Claude for continued conversation
+                const continuationMessages = [
+                  ...messages.map((m: { role: string; content: string }) => ({
+                    role: m.role,
+                    content: m.content,
+                  })),
+                  {
+                    role: 'assistant',
+                    content: [
+                      {
+                        type: 'tool_use',
+                        id: toolUseId,
+                        name: 'create_task',
+                        input: JSON.parse(currentToolInput || '{}'),
+                      },
+                    ],
+                  },
+                  {
+                    role: 'user',
+                    content: [{ type: 'tool_result', tool_use_id: toolUseId, content: toolResultContent }],
+                  },
+                ]
+
+                // Second API call — get Claude's response after tool execution
+                const continuationResponse = await fetch(apiUrl, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'x-api-key': apiKey,
+                    'anthropic-version': '2023-06-01',
+                  },
+                  body: JSON.stringify({
+                    model: 'claude-sonnet-4-5-20241022',
+                    max_tokens: 2048,
+                    system: ORCHESTRATOR_SYSTEM_PROMPT,
+                    tools,
+                    messages: continuationMessages,
+                    stream: true,
+                  }),
+                })
+
+                if (continuationResponse.ok) {
+                  const contReader = continuationResponse.body?.getReader()
+                  if (contReader) {
+                    let contBuffer = ''
+                    while (true) {
+                      const { done: contDone, value: contValue } = await contReader.read()
+                      if (contDone) break
+
+                      contBuffer += decoder.decode(contValue, { stream: true })
+                      const contLines = contBuffer.split('\n')
+                      contBuffer = contLines.pop() || ''
+
+                      for (const contLine of contLines) {
+                        if (!contLine.startsWith('data: ')) continue
+                        const contData = contLine.slice(6).trim()
+                        if (contData === '[DONE]') continue
+
+                        try {
+                          const contEvent = JSON.parse(contData)
+                          if (contEvent.type === 'content_block_delta' && contEvent.delta?.type === 'text_delta') {
+                            controller.enqueue(encoder.encode(`0:${JSON.stringify(contEvent.delta.text)}\n`))
+                          }
+                        } catch {
+                          // Skip
+                        }
+                      }
+                    }
+                  }
                 }
 
                 currentToolName = ''
                 currentToolInput = ''
+                toolUseId = ''
               }
             } catch {
               // Skip malformed events

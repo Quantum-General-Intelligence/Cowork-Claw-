@@ -238,7 +238,18 @@ export async function POST(request: NextRequest) {
         )
       } catch (error) {
         console.error('Task processing failed:', error)
-        // Error handling is already done inside processTaskWithTimeout
+        // Safety net: ensure task status is set to error if processTask didn't handle it
+        try {
+          const [task] = await db.select().from(tasks).where(eq(tasks.id, newTask.id)).limit(1)
+          if (task && task.status === 'processing') {
+            const errorMsg = error instanceof Error ? error.message : 'Task processing failed unexpectedly'
+            await db.update(tasks).set({ status: 'error', updatedAt: new Date() }).where(eq(tasks.id, newTask.id))
+            const errorLogger = createTaskLogger(newTask.id)
+            await errorLogger.updateStatus('error', errorMsg)
+          }
+        } catch {
+          // Last resort — can't even update DB
+        }
       }
     })
 
