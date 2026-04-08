@@ -45,8 +45,8 @@ const FEATURES = [
 
 const AGENT_NAMES = ['Claude', 'Codex', 'Copilot', 'Cursor', 'Gemini', 'OpenCode', 'Pi']
 
-function handlePricingSelect() {
-  window.location.href = '/api/auth/signin/github'
+function handlePricingSelect(planId: string) {
+  window.location.href = `/api/auth/signin/github?next=/subscribe?plan=${planId}`
 }
 
 export function LandingPage() {
