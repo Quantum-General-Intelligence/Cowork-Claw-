@@ -9,5 +9,4 @@ services:
       - "traefik.http.routers.cowork-claw.rule=Host(`cowork-claw.ai`) || Host(`www.cowork-claw.ai`)"
       - "traefik.http.routers.cowork-claw.entrypoints=websecure"
       - "traefik.http.routers.cowork-claw.tls.certresolver=letsencrypt"
-      - "traefik.http.services.cowork-claw.loadbalancer.server.port=3000"
       - "traefik.http.services.cowork-claw.loadbalancer.server.url=http://127.0.0.1:3000"
