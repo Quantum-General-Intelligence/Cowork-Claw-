@@ -26,8 +26,11 @@ export async function POST(req: NextRequest) {
         const stripeCustomerId = session.customer as string
 
         if (userId) {
-          // Get subscription details
           const stripeSub = await stripe.subscriptions.retrieve(stripeSubscriptionId)
+          const periodStart = new Date(
+            (stripeSub as unknown as { current_period_start: number }).current_period_start * 1000,
+          )
+          const periodEnd = new Date((stripeSub as unknown as { current_period_end: number }).current_period_end * 1000)
 
           await db
             .insert(subscriptions)
@@ -38,26 +41,18 @@ export async function POST(req: NextRequest) {
               status: 'active',
               stripeCustomerId,
               stripeSubscriptionId,
-              currentPeriodStart: new Date(
-                (stripeSub as unknown as { current_period_start: number }).current_period_start * 1000,
-              ),
-              currentPeriodEnd: new Date(
-                (stripeSub as unknown as { current_period_end: number }).current_period_end * 1000,
-              ),
+              currentPeriodStart: periodStart,
+              currentPeriodEnd: periodEnd,
             })
             .onConflictDoUpdate({
-              target: subscriptions.id,
+              target: subscriptions.userId,
               set: {
                 planId,
                 status: 'active',
                 stripeCustomerId,
                 stripeSubscriptionId,
-                currentPeriodStart: new Date(
-                  (stripeSub as unknown as { current_period_start: number }).current_period_start * 1000,
-                ),
-                currentPeriodEnd: new Date(
-                  (stripeSub as unknown as { current_period_end: number }).current_period_end * 1000,
-                ),
+                currentPeriodStart: periodStart,
+                currentPeriodEnd: periodEnd,
                 updatedAt: new Date(),
               },
             })

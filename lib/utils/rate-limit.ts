@@ -2,12 +2,14 @@ import { db } from '@/lib/db/client'
 import { tasks, taskMessages } from '@/lib/db/schema'
 import { eq, gte, and, isNull } from 'drizzle-orm'
 import { getMaxMessagesPerDay } from '@/lib/db/settings'
+import { getUserPlan } from '@/lib/billing/check-subscription'
 
 export async function checkRateLimit(
   userId: string,
 ): Promise<{ allowed: boolean; remaining: number; total: number; resetAt: Date }> {
-  // Get max messages per day for this user (user-specific > global > env var)
-  const maxMessagesPerDay = await getMaxMessagesPerDay(userId)
+  // Plan-aware limit: use subscription tier or admin override (whichever is higher)
+  const [adminMax, userPlan] = await Promise.all([getMaxMessagesPerDay(userId), getUserPlan(userId)])
+  const maxMessagesPerDay = Math.max(adminMax, userPlan.dailyApiCalls)
 
   // Get start of today (UTC)
   const today = new Date()

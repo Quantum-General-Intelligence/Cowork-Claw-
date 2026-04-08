@@ -20,9 +20,9 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Cowork-Claw',
+  title: 'Cowork-Claw | AI Coding Agent Platform',
   description:
-    'AI agent orchestration platform — OpenClaw coordinates a team of coding agents to accomplish your tasks',
+    'Orchestrate a team of AI coding agents — Claude, Codex, Copilot, Cursor, Gemini and more — to build, fix, and ship code from your browser.',
 }
 
 export default function RootLayout({

@@ -1,10 +1,16 @@
 import { getServerSession } from '@/lib/session/get-server-session'
 import { getGitHubStars } from '@/lib/github-stars'
 import { OpenClawChat } from '@/components/openclaw-chat'
+import { LandingPage } from '@/components/landing-page'
 import { cookies } from 'next/headers'
 
 export default async function Home() {
   const session = await getServerSession()
+
+  if (!session?.user) {
+    return <LandingPage />
+  }
+
   const stars = await getGitHubStars()
   const cookieStore = await cookies()
 
@@ -13,8 +19,8 @@ export default async function Home() {
 
   return (
     <OpenClawChat
-      user={session?.user ?? null}
-      authProvider={session?.authProvider ?? null}
+      user={session.user}
+      authProvider={session.authProvider ?? null}
       initialStars={stars}
       selectedOwner={selectedOwner}
       selectedRepo={selectedRepo}

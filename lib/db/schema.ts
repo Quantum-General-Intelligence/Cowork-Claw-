@@ -615,19 +615,33 @@ export const usageMeters = pgTable(
 export type UsageMeter = typeof usageMeters.$inferSelect
 
 // Subscriptions — billing plan per user
-export const subscriptions = pgTable('subscriptions', {
-  id: text('id').primaryKey(),
-  userId: text('user_id')
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  planId: text('plan_id').notNull().default('free'), // free, pro, enterprise
-  status: text('status').notNull().default('active'), // active, past_due, canceled
-  stripeCustomerId: text('stripe_customer_id'),
-  stripeSubscriptionId: text('stripe_subscription_id'),
-  currentPeriodStart: timestamp('current_period_start'),
-  currentPeriodEnd: timestamp('current_period_end'),
-  createdAt: timestamp('created_at').defaultNow().notNull(),
-  updatedAt: timestamp('updated_at').defaultNow().notNull(),
-})
+export const subscriptions = pgTable(
+  'subscriptions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    planId: text('plan_id').notNull().default('hobby'), // hobby, pro, business
+    status: text('status').notNull().default('active'), // active, past_due, canceled
+    stripeCustomerId: text('stripe_customer_id'),
+    stripeSubscriptionId: text('stripe_subscription_id'),
+    currentPeriodStart: timestamp('current_period_start'),
+    currentPeriodEnd: timestamp('current_period_end'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('subscriptions_user_id_idx').on(table.userId)],
+)
 
 export type Subscription = typeof subscriptions.$inferSelect
+
+// Waitlist — collect emails before granting access
+export const waitlist = pgTable('waitlist', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull().unique(),
+  githubUsername: text('github_username'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export type WaitlistEntry = typeof waitlist.$inferSelect
