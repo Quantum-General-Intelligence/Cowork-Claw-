@@ -2,6 +2,8 @@ import { getServerSession } from '@/lib/session/get-server-session'
 import { getGitHubStars } from '@/lib/github-stars'
 import { OpenClawChat } from '@/components/openclaw-chat'
 import { LandingPage } from '@/components/landing-page'
+import { getUserPlan } from '@/lib/billing/check-subscription'
+import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 
 export default async function Home() {
@@ -9,6 +11,13 @@ export default async function Home() {
 
   if (!session?.user) {
     return <LandingPage />
+  }
+
+  const userPlan = await getUserPlan(session.user.id)
+  const hasActiveSubscription = userPlan.stripeSubscriptionId && userPlan.status === 'active'
+
+  if (!hasActiveSubscription) {
+    redirect('/settings/billing')
   }
 
   const stars = await getGitHubStars()

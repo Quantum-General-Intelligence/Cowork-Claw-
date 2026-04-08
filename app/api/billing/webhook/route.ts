@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
         const sub = event.data.object
         await db
           .update(subscriptions)
-          .set({ status: 'canceled', planId: 'free', updatedAt: new Date() })
+          .set({ status: 'canceled', updatedAt: new Date() })
           .where(eq(subscriptions.stripeSubscriptionId, sub.id))
         break
       }

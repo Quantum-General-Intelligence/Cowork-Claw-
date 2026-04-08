@@ -14,10 +14,10 @@ export interface UserPlan {
 
 const DEFAULT_PLAN: UserPlan = {
   planId: 'hobby',
-  name: PLANS.hobby.name,
-  dailyApiCalls: PLANS.hobby.dailyApiCalls,
-  monthlySandboxMinutes: PLANS.hobby.monthlySandboxMinutes,
-  status: 'active',
+  name: 'No Plan',
+  dailyApiCalls: 0,
+  monthlySandboxMinutes: 0,
+  status: 'inactive',
   stripeSubscriptionId: null,
 }
 

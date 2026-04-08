@@ -2,7 +2,7 @@
 
 import { Button } from '@/components/ui/button'
 import { PricingCards } from '@/components/pricing-cards'
-import { ArrowRight, GitBranch, Terminal, Bot, GitPullRequest, Globe, Shield } from 'lucide-react'
+import { ArrowRight, GitBranch, Terminal, Bot, GitPullRequest, Globe, Shield, Key } from 'lucide-react'
 import Link from 'next/link'
 
 const FEATURES = [
@@ -27,6 +27,11 @@ const FEATURES = [
     description: 'Agents push code, open pull requests, and respond to review comments automatically.',
   },
   {
+    icon: Key,
+    title: 'Bring Your Own Key',
+    description: 'Use your own API keys for AI providers, or use ours — both included in every plan.',
+  },
+  {
     icon: Globe,
     title: 'Browser-Based IDE',
     description: 'File editor, terminal, diff viewer, and LSP — all in your browser, no local setup.',
@@ -40,6 +45,10 @@ const FEATURES = [
 
 const AGENT_NAMES = ['Claude', 'Codex', 'Copilot', 'Cursor', 'Gemini', 'OpenCode', 'Pi']
 
+function handlePricingSelect() {
+  window.location.href = '/api/auth/signin/github'
+}
+
 export function LandingPage() {
   return (
     <div className="min-h-dvh bg-background text-foreground">
@@ -51,8 +60,11 @@ export function LandingPage() {
             <a href="#pricing" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
               Pricing
             </a>
+            <a href="#features" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
+              Features
+            </a>
             <Link href="/api/auth/signin/github">
-              <Button size="sm">Sign in with GitHub</Button>
+              <Button size="sm">Sign In</Button>
             </Link>
           </div>
         </div>
@@ -70,15 +82,18 @@ export function LandingPage() {
             Describe what you want to build. Cowork-Claw orchestrates Claude, Codex, Copilot, Cursor, Gemini and more to
             get it done — sandboxed, with PRs and full git history.
           </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            All plans include hosted sandbox execution and bring-your-own-key support.
+          </p>
           <div className="mt-8 flex items-center justify-center gap-3">
             <Link href="/api/auth/signin/github">
               <Button size="lg" className="gap-2">
-                Get Started <ArrowRight className="h-4 w-4" />
+                Sign In with GitHub <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>
             <a href="#pricing">
               <Button size="lg" variant="outline">
-                View Pricing
+                View Plans
               </Button>
             </a>
           </div>
@@ -100,7 +115,7 @@ export function LandingPage() {
       </section>
 
       {/* Features */}
-      <section className="py-20 sm:py-28 px-4 sm:px-6">
+      <section id="features" className="py-20 sm:py-28 px-4 sm:px-6">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-12">Everything you need to ship faster</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -122,9 +137,9 @@ export function LandingPage() {
         <div className="max-w-5xl mx-auto">
           <h2 className="text-2xl sm:text-3xl font-bold text-center mb-4">Simple, transparent pricing</h2>
           <p className="text-center text-muted-foreground mb-12 max-w-lg mx-auto">
-            Start free. Upgrade when you need more power.
+            Every plan includes hosted sandbox execution and bring-your-own-key support. No hidden fees.
           </p>
-          <PricingCards />
+          <PricingCards onSelectPlan={handlePricingSelect} />
         </div>
       </section>
 

@@ -9,27 +9,35 @@ const PLANS = [
   {
     id: 'hobby',
     name: 'Hobby',
-    price: 0,
-    interval: 'forever',
-    description: 'For personal projects and experimentation',
-    features: ['5 tasks per day', '60 sandbox minutes/month', 'All AI agents', 'Community support'],
+    price: 20,
+    interval: '/month',
+    description: 'For individual developers and side projects',
+    features: [
+      '20 tasks per day',
+      '200 sandbox minutes/month',
+      'All AI agents',
+      'Bring your own key or use ours',
+      'Hosted sandbox execution',
+    ],
     cta: 'Get Started',
     highlighted: false,
   },
   {
     id: 'pro',
     name: 'Pro',
-    price: 20,
+    price: 75,
     interval: '/month',
     description: 'For professional developers shipping daily',
     features: [
-      '50 tasks per day',
-      '600 sandbox minutes/month',
+      '100 tasks per day',
+      '1,500 sandbox minutes/month',
       'All AI agents',
+      'Bring your own key or use ours',
+      'Hosted sandbox execution',
       'Priority support',
       'Orchestration mode',
     ],
-    cta: 'Upgrade to Pro',
+    cta: 'Get Pro',
     highlighted: true,
   },
   {
@@ -37,16 +45,19 @@ const PLANS = [
     name: 'Business',
     price: 40,
     interval: '/user/month',
-    description: 'For teams that build together',
+    minSeats: 3,
+    description: 'For teams that build together (min. 3 users)',
     features: [
-      '200 tasks per day',
+      '200 tasks per day per user',
       '3,000 sandbox minutes/month',
       'All AI agents',
+      'Bring your own key or use ours',
+      'Hosted sandbox execution',
       'Team workspaces',
       'Priority support',
       'Usage analytics',
     ],
-    cta: 'Upgrade to Business',
+    cta: 'Get Business',
     highlighted: false,
   },
 ]
@@ -59,7 +70,7 @@ interface PricingCardsProps {
 
 export function PricingCards({ currentPlanId, onSelectPlan, loading }: PricingCardsProps) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-5xl mx-auto">
       {PLANS.map((plan) => {
         const isCurrent = currentPlanId === plan.id
         return (
@@ -82,6 +93,11 @@ export function PricingCards({ currentPlanId, onSelectPlan, loading }: PricingCa
                 <span className="text-3xl font-bold">${plan.price}</span>
                 <span className="text-sm text-muted-foreground ml-1">{plan.interval}</span>
               </div>
+              {'minSeats' in plan && typeof plan.minSeats === 'number' && plan.minSeats > 1 && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Starts at ${plan.price * plan.minSeats}/month for {plan.minSeats} users
+                </p>
+              )}
             </CardHeader>
             <CardContent className="flex-1 flex flex-col">
               <ul className="space-y-2 flex-1 mb-6">
@@ -95,7 +111,7 @@ export function PricingCards({ currentPlanId, onSelectPlan, loading }: PricingCa
               <Button
                 className="w-full"
                 variant={plan.highlighted ? 'default' : 'outline'}
-                disabled={isCurrent || loading || plan.id === 'hobby'}
+                disabled={isCurrent || loading}
                 onClick={() => onSelectPlan?.(plan.id)}
               >
                 {isCurrent ? 'Current Plan' : plan.cta}
