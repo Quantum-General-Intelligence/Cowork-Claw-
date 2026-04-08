@@ -6,6 +6,7 @@ import { eq, and } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import { createGitHubSession, saveSession } from '@/lib/session/create-github'
 import { encrypt } from '@/lib/crypto'
+import { getOrigin } from '@/lib/utils/get-origin'
 
 export async function GET(req: NextRequest): Promise<Response> {
   const code = req.nextUrl.searchParams.get('code')
@@ -221,7 +222,7 @@ export async function GET(req: NextRequest): Promise<Response> {
       cookieStore.delete(`github_oauth_user_id`)
 
       // Redirect back to app
-      return Response.redirect(new URL(storedRedirectTo, req.nextUrl.origin))
+      return Response.redirect(new URL(storedRedirectTo, getOrigin(req)))
     }
   } catch (error) {
     console.error('[GitHub Callback] OAuth callback error:', error)

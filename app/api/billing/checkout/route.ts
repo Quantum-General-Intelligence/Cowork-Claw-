@@ -3,6 +3,7 @@ import { getServerSession } from '@/lib/session/get-server-session'
 import { getStripe, PLANS, type PlanId } from '@/lib/billing/stripe'
 import { db } from '@/lib/db/client'
 import { subscriptions } from '@/lib/db/schema'
+import { getOrigin } from '@/lib/utils/get-origin'
 import { eq } from 'drizzle-orm'
 
 export async function POST(req: NextRequest) {
@@ -38,8 +39,8 @@ export async function POST(req: NextRequest) {
       customer: customerId,
       mode: 'subscription',
       line_items: [{ price: plan.priceId, quantity: 1 }],
-      success_url: `${req.nextUrl.origin}/settings/billing?success=true`,
-      cancel_url: `${req.nextUrl.origin}/settings/billing?canceled=true`,
+      success_url: `${getOrigin(req)}/settings/billing?success=true`,
+      cancel_url: `${getOrigin(req)}/settings/billing?canceled=true`,
       metadata: { userId: session.user.id, planId },
     })
 

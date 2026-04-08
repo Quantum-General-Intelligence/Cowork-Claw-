@@ -3,13 +3,15 @@ import { cookies } from 'next/headers'
 import { generateState } from 'arctic'
 import { isRelativeUrl } from '@/lib/utils/is-relative-url'
 import { getSessionFromReq } from '@/lib/session/server'
+import { getOrigin } from '@/lib/utils/get-origin'
 
 export async function GET(req: NextRequest): Promise<Response> {
   // Check if user is already authenticated with Vercel
   const session = await getSessionFromReq(req)
 
   const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID
-  const redirectUri = `${req.nextUrl.origin}/api/auth/github/callback`
+  const origin = getOrigin(req)
+  const redirectUri = `${origin}/api/auth/github/callback`
 
   if (!clientId) {
     return Response.redirect(new URL('/?error=github_not_configured', req.url))
@@ -28,7 +30,7 @@ export async function GET(req: NextRequest): Promise<Response> {
 
   // Add a query parameter to show a toast message after redirect
   if (!isSignInFlow) {
-    const redirectUrl = new URL(redirectTo, req.nextUrl.origin)
+    const redirectUrl = new URL(redirectTo, origin)
     redirectUrl.searchParams.set('github_connected', 'true')
     redirectTo = redirectUrl.pathname + redirectUrl.search
   }

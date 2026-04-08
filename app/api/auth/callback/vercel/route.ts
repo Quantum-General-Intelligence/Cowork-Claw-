@@ -2,6 +2,7 @@ import { type NextRequest } from 'next/server'
 import { OAuth2Client, type OAuth2Tokens } from 'arctic'
 import { createSession, saveSession } from '@/lib/session/create'
 import { cookies } from 'next/headers'
+import { getOrigin } from '@/lib/utils/get-origin'
 
 export async function GET(req: NextRequest): Promise<Response> {
   const code = req.nextUrl.searchParams.get('code')
@@ -26,7 +27,7 @@ export async function GET(req: NextRequest): Promise<Response> {
   const client = new OAuth2Client(
     process.env.NEXT_PUBLIC_VERCEL_CLIENT_ID ?? '',
     process.env.VERCEL_CLIENT_SECRET ?? '',
-    `${req.nextUrl.origin}/api/auth/callback/vercel`,
+    `${getOrigin(req)}/api/auth/callback/vercel`,
   )
 
   let tokens: OAuth2Tokens

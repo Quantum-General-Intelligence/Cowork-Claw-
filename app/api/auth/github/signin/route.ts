@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { getSessionFromReq } from '@/lib/session/server'
 import { isRelativeUrl } from '@/lib/utils/is-relative-url'
 import { generateState } from 'arctic'
+import { getOrigin } from '@/lib/utils/get-origin'
 
 export async function GET(req: NextRequest): Promise<Response> {
   // Check if user is authenticated with Vercel first
@@ -11,8 +12,9 @@ export async function GET(req: NextRequest): Promise<Response> {
     return Response.redirect(new URL('/', req.url))
   }
 
+  const origin = getOrigin(req)
   const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID
-  const redirectUri = `${req.nextUrl.origin}/api/auth/github/callback`
+  const redirectUri = `${origin}/api/auth/github/callback`
 
   if (!clientId) {
     return Response.redirect(new URL('/?error=github_not_configured', req.url))
@@ -61,7 +63,7 @@ export async function POST(req: NextRequest): Promise<Response> {
   }
 
   const clientId = process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID
-  const redirectUri = `${req.nextUrl.origin}/api/auth/github/callback`
+  const redirectUri = `${getOrigin(req)}/api/auth/github/callback`
 
   if (!clientId) {
     return Response.json({ error: 'GitHub OAuth not configured' }, { status: 500 })

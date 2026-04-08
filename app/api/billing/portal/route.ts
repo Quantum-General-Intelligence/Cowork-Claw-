@@ -3,6 +3,7 @@ import { getServerSession } from '@/lib/session/get-server-session'
 import { getStripe } from '@/lib/billing/stripe'
 import { db } from '@/lib/db/client'
 import { subscriptions } from '@/lib/db/schema'
+import { getOrigin } from '@/lib/utils/get-origin'
 import { eq } from 'drizzle-orm'
 
 export async function POST(req: NextRequest) {
@@ -21,7 +22,7 @@ export async function POST(req: NextRequest) {
     const stripe = getStripe()
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: sub.stripeCustomerId,
-      return_url: `${req.nextUrl.origin}/settings/billing`,
+      return_url: `${getOrigin(req)}/settings/billing`,
     })
 
     return NextResponse.json({ url: portalSession.url })
