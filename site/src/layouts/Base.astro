@@ -1,0 +1,73 @@
+---
+import '../styles/globals.css'
+
+interface Props {
+  title?: string
+  description?: string
+}
+
+const {
+  title = 'Cowork-Claw | AI Coding Agent Platform',
+  description = 'Orchestrate a team of AI coding agents — Claude, Codex, Copilot, Cursor, Gemini and more — to build, fix, and ship code from your browser.',
+} = Astro.props
+
+const APP_URL = 'https://app.cowork-claw.ai'
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <title>{title}</title>
+  </head>
+  <body class="min-h-dvh bg-background text-foreground antialiased">
+    <!-- Nav -->
+    <header class="border-b border-border bg-background/80 backdrop-blur-sm sticky top-0 z-50">
+      <div class="max-w-6xl mx-auto flex items-center justify-between h-14 px-4 sm:px-6">
+        <a href="/" class="text-lg font-bold tracking-tight">Cowork-Claw</a>
+        <div class="flex items-center gap-4 sm:gap-6">
+          <a href="/pricing" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
+          <a href="/features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
+          <a
+            href={`${APP_URL}/api/auth/signin/github`}
+            class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90 transition-opacity"
+          >
+            Sign In
+          </a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <slot />
+    </main>
+
+    <!-- Footer -->
+    <footer class="py-10 px-4 sm:px-6 border-t border-border">
+      <div class="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-muted-foreground">
+        <span>&copy; {new Date().getFullYear()} Cowork-Claw. All rights reserved.</span>
+        <div class="flex items-center gap-6">
+          <a href="/pricing" class="hover:text-foreground transition-colors">Pricing</a>
+          <a href="/features" class="hover:text-foreground transition-colors">Features</a>
+          <a
+            href="https://github.com/Quantum-General-Intelligence/Cowork-Claw-"
+            target="_blank"
+            rel="noopener noreferrer"
+            class="hover:text-foreground transition-colors"
+          >
+            GitHub
+          </a>
+        </div>
+      </div>
+    </footer>
+  </body>
+</html>

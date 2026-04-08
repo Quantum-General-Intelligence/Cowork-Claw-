@@ -8,7 +8,6 @@ import { SessionProvider } from '@/components/auth/session-provider'
 import { JotaiProvider } from '@/components/providers/jotai-provider'
 import { Analytics } from '@vercel/analytics/react'
 import { SpeedInsights } from '@vercel/speed-insights/next'
-import { getServerSession } from '@/lib/session/get-server-session'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -26,21 +25,18 @@ export const metadata: Metadata = {
     'Orchestrate a team of AI coding agents — Claude, Codex, Copilot, Cursor, Gemini and more — to build, fix, and ship code from your browser.',
 }
 
-export default async function RootLayout({
+export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const session = await getServerSession()
-  const isAuthenticated = !!session?.user
-
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
         <JotaiProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <SessionProvider />
-            {isAuthenticated ? <AppLayoutWrapper>{children}</AppLayoutWrapper> : children}
+            <AppLayoutWrapper>{children}</AppLayoutWrapper>
             <Toaster />
           </ThemeProvider>
         </JotaiProvider>

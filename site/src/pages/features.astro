@@ -1,0 +1,123 @@
+---
+import Base from '../layouts/Base.astro'
+
+const APP_URL = 'https://app.cowork-claw.ai'
+
+const FEATURE_SECTIONS = [
+  {
+    title: 'Multi-Agent Orchestration',
+    description: 'Send a task and Cowork-Claw picks the best agent — or coordinates multiple agents in parallel. Claude writes the logic, Codex handles tests, Copilot suggests optimizations, all in one workflow.',
+    items: [
+      'Route tasks to the best AI agent automatically',
+      'Parallel agent execution for complex tasks',
+      'Support for Claude, Codex, Copilot, Cursor, Gemini, and more',
+      'Custom agent selection per task',
+    ],
+  },
+  {
+    title: 'Isolated Docker Sandboxes',
+    description: 'Every task runs in a fresh, isolated Docker container with a full development environment. Install dependencies, run builds, execute tests — all without touching your local machine.',
+    items: [
+      'Full Node.js, Python, and system tool access',
+      'Persistent file system within sandbox sessions',
+      'Automatic dependency installation',
+      'Configurable sandbox duration',
+    ],
+  },
+  {
+    title: 'GitHub-Native Workflow',
+    description: 'Connect your repos, and agents create branches, commit code, and open pull requests. Review diffs in the browser, approve changes, and merge — a full code review loop with AI.',
+    items: [
+      'Automatic branch creation and code commits',
+      'Pull request creation with descriptions',
+      'In-browser diff viewer and file editor',
+      'Comment on PRs and agents respond',
+    ],
+  },
+  {
+    title: 'Browser-Based IDE',
+    description: 'A complete development environment in your browser. Monaco editor, integrated terminal, git diff viewer, and LSP support — no local setup required.',
+    items: [
+      'Monaco code editor with syntax highlighting',
+      'Integrated terminal with shell access',
+      'Git diff viewer for all changes',
+      'Live preview for web applications',
+    ],
+  },
+  {
+    title: 'Bring Your Own Key',
+    description: 'Use your own API keys for AI providers like Anthropic, OpenAI, and Google. Keys are encrypted at rest and used only within your isolated sandboxes. Or skip the hassle and use the included shared quota.',
+    items: [
+      'Encrypted key storage (AES-256-GCM)',
+      'Keys scoped to your sandboxes only',
+      'Support for Anthropic, OpenAI, Google, and more',
+      'Shared quota included in every plan',
+    ],
+  },
+  {
+    title: 'Security & Isolation',
+    description: 'Every session is isolated. Credentials are encrypted with JWE. Sandboxes are ephemeral Docker containers with no cross-tenant access. OAuth tokens are scoped and never logged.',
+    items: [
+      'JWE-encrypted session cookies',
+      'Ephemeral, isolated Docker sandboxes',
+      'No credential logging — static log messages only',
+      'Scoped OAuth tokens per provider',
+    ],
+  },
+]
+---
+
+<Base title="Features - Cowork-Claw" description="Explore Cowork-Claw features: multi-agent orchestration, Docker sandboxes, GitHub integration, browser IDE, and more.">
+  <section class="py-20 sm:py-28 px-4 sm:px-6">
+    <div class="max-w-4xl mx-auto">
+      <h1 class="text-3xl sm:text-4xl font-bold text-center mb-4">Features</h1>
+      <p class="text-center text-muted-foreground mb-16 max-w-lg mx-auto">
+        Everything you need to orchestrate AI agents, manage code, and ship faster.
+      </p>
+
+      <div class="space-y-16">
+        {FEATURE_SECTIONS.map((section, i) => (
+          <div class={`flex flex-col ${i % 2 === 1 ? 'md:flex-row-reverse' : 'md:flex-row'} gap-8 items-start`}>
+            <div class="flex-1">
+              <h2 class="text-xl sm:text-2xl font-bold mb-3">{section.title}</h2>
+              <p class="text-muted-foreground leading-relaxed mb-4">{section.description}</p>
+              <ul class="space-y-2">
+                {section.items.map((item) => (
+                  <li class="flex items-start gap-2 text-sm">
+                    <svg class="h-4 w-4 text-primary mt-0.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7"/></svg>
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div class="flex-1 w-full rounded-xl border border-border bg-muted/30 h-48 flex items-center justify-center text-muted-foreground text-sm">
+              {section.title}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-16 sm:py-20 px-4 sm:px-6 bg-muted/30 border-t border-border">
+    <div class="max-w-2xl mx-auto text-center">
+      <h2 class="text-xl sm:text-2xl font-bold mb-4">Start shipping with AI agents</h2>
+      <p class="text-muted-foreground mb-6">Sign in with GitHub and launch your first task in minutes.</p>
+      <div class="flex items-center justify-center gap-3 flex-wrap">
+        <a
+          href={`${APP_URL}/api/auth/signin/github`}
+          class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90 transition-opacity"
+        >
+          Get Started
+        </a>
+        <a
+          href="/pricing"
+          class="inline-flex items-center justify-center rounded-md border border-border bg-background px-6 py-3 text-sm font-medium text-foreground hover:bg-accent transition-colors"
+        >
+          View Pricing
+        </a>
+      </div>
+    </div>
+  </section>
+</Base>

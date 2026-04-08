@@ -6,7 +6,19 @@ services:
     network_mode: host
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.cowork-claw.rule=Host(`cowork-claw.ai`) || Host(`www.cowork-claw.ai`)"
+      - "traefik.http.routers.cowork-claw.rule=Host(`app.cowork-claw.ai`)"
       - "traefik.http.routers.cowork-claw.entrypoints=websecure"
       - "traefik.http.routers.cowork-claw.tls.certresolver=letsencrypt"
       - "traefik.http.services.cowork-claw.loadbalancer.server.url=http://127.0.0.1:3000"
+
+  cowork-claw-site:
+    build: ./site
+    restart: unless-stopped
+    ports:
+      - "4321:4321"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.site.rule=Host(`cowork-claw.ai`) || Host(`www.cowork-claw.ai`)"
+      - "traefik.http.routers.site.entrypoints=websecure"
+      - "traefik.http.routers.site.tls.certresolver=letsencrypt"
+      - "traefik.http.services.site.loadbalancer.server.port=4321"

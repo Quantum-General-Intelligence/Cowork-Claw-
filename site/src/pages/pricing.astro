@@ -1,0 +1,76 @@
+---
+import Base from '../layouts/Base.astro'
+import PricingCards from '../components/PricingCards'
+
+const APP_URL = 'https://app.cowork-claw.ai'
+---
+
+<Base title="Pricing - Cowork-Claw" description="Simple, transparent pricing for Cowork-Claw. Hobby, Pro, and Business plans with hosted sandbox execution and bring-your-own-key support.">
+  <section class="py-20 sm:py-28 px-4 sm:px-6">
+    <div class="max-w-5xl mx-auto">
+      <h1 class="text-3xl sm:text-4xl font-bold text-center mb-4">Pricing</h1>
+      <p class="text-center text-muted-foreground mb-12 max-w-lg mx-auto">
+        Every plan includes hosted sandbox execution and bring-your-own-key support. No hidden fees.
+      </p>
+      <PricingCards client:load />
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="py-16 sm:py-20 px-4 sm:px-6 border-t border-border">
+    <div class="max-w-2xl mx-auto">
+      <h2 class="text-2xl font-bold text-center mb-10">Frequently asked questions</h2>
+      <div class="space-y-6">
+        <div>
+          <h3 class="font-semibold mb-1">What does "bring your own key" mean?</h3>
+          <p class="text-sm text-muted-foreground leading-relaxed">
+            You can use your own API keys for Claude, OpenAI, Gemini, and other providers.
+            Your keys are encrypted and only used within your sandboxes. Alternatively, every plan
+            includes access using our shared API quota.
+          </p>
+        </div>
+        <div>
+          <h3 class="font-semibold mb-1">What counts as a "task"?</h3>
+          <p class="text-sm text-muted-foreground leading-relaxed">
+            A task is a single prompt or follow-up message sent to the AI agents. Creating a new task
+            or continuing an existing one both count toward your daily limit.
+          </p>
+        </div>
+        <div>
+          <h3 class="font-semibold mb-1">How does Business pricing work?</h3>
+          <p class="text-sm text-muted-foreground leading-relaxed">
+            Business is $40 per user per month with a minimum of 3 users ($120/month minimum).
+            Each user gets their own task quota and sandbox allocation.
+          </p>
+        </div>
+        <div>
+          <h3 class="font-semibold mb-1">Can I cancel anytime?</h3>
+          <p class="text-sm text-muted-foreground leading-relaxed">
+            Yes. You can cancel or change your plan at any time from the billing settings.
+            Your subscription will remain active until the end of the current billing period.
+          </p>
+        </div>
+        <div>
+          <h3 class="font-semibold mb-1">What sandbox execution is included?</h3>
+          <p class="text-sm text-muted-foreground leading-relaxed">
+            Every plan includes fully hosted Docker sandboxes where AI agents run your code.
+            Sandboxes include a file editor, terminal, and live preview — all in your browser.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-16 sm:py-20 px-4 sm:px-6 bg-muted/30 border-t border-border">
+    <div class="max-w-2xl mx-auto text-center">
+      <h2 class="text-xl sm:text-2xl font-bold mb-4">Ready to get started?</h2>
+      <a
+        href={`${APP_URL}/api/auth/signin/github`}
+        class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90 transition-opacity"
+      >
+        Sign In with GitHub
+      </a>
+    </div>
+  </section>
+</Base>

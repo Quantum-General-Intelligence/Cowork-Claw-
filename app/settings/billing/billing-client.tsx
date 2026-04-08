@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { PricingCards } from '@/components/pricing-cards'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,10 @@ export function BillingClient({
 }: BillingClientProps) {
   const [loading, setLoading] = useState(false)
   const isActive = hasStripeSubscription && status === 'active'
+
+  useEffect(() => {
+    fetch('/api/auth/subscription-status').catch(() => {})
+  }, [])
 
   async function handleSelectPlan(selectedPlanId: string) {
     setLoading(true)

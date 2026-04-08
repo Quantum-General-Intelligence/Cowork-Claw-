@@ -7,6 +7,7 @@ import { nanoid } from 'nanoid'
 import { createGitHubSession, saveSession } from '@/lib/session/create-github'
 import { encrypt } from '@/lib/crypto'
 import { getOrigin } from '@/lib/utils/get-origin'
+import { getUserPlan } from '@/lib/billing/check-subscription'
 
 export async function GET(req: NextRequest): Promise<Response> {
   const code = req.nextUrl.searchParams.get('code')
@@ -133,6 +134,17 @@ export async function GET(req: NextRequest): Promise<Response> {
 
       // Save session to cookie
       await saveSession(response, session)
+
+      // Set subscription status cookie for middleware enforcement
+      const plan = await getUserPlan(session.user.id)
+      const isActive = !!plan.stripeSubscriptionId && plan.status === 'active'
+      cookieStore.set('_sub_status', isActive ? 'active' : 'inactive', {
+        path: '/',
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60,
+      })
 
       // Clean up cookies
       cookieStore.delete(`github_auth_state`)
