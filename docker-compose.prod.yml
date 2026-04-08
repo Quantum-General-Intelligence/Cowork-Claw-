@@ -1,0 +1,13 @@
+services:
+  cowork-claw:
+    build: .
+    restart: unless-stopped
+    env_file: .env.local
+    ports:
+      - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.cowork-claw.rule=Host(`cowork-claw.ai`) || Host(`www.cowork-claw.ai`)"
+      - "traefik.http.routers.cowork-claw.entrypoints=websecure"
+      - "traefik.http.routers.cowork-claw.tls.certresolver=letsencrypt"
+      - "traefik.http.services.cowork-claw.loadbalancer.server.port=3000"
