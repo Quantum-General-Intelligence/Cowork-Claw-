@@ -100,7 +100,7 @@ export async function getUserById(userId: string) {
 /**
  * Get user by auth provider and external ID
  */
-export async function getUserByExternalId(provider: 'github' | 'vercel', externalId: string) {
+export async function getUserByExternalId(provider: 'github' | 'vercel' | 'google' | 'email', externalId: string) {
   const result = await db
     .select()
     .from(users)

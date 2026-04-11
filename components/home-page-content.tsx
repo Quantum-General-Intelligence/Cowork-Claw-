@@ -549,7 +549,7 @@ export function HomePageContent({
 
   const handleGitHubSignIn = () => {
     setLoadingGitHub(true)
-    window.location.href = '/api/auth/signin/github'
+    window.location.href = '/auth'
   }
 
   return (

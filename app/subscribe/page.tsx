@@ -12,7 +12,7 @@ export default async function SubscribePage({ searchParams }: Props) {
   const params = await searchParams
 
   if (!session?.user) {
-    redirect(`/api/auth/signin/github?next=/subscribe?plan=${params.plan || 'hobby'}`)
+    redirect(`/auth?next=/subscribe?plan=${params.plan || 'hobby'}`)
   }
 
   const planId = (params.plan as PlanId) || 'hobby'

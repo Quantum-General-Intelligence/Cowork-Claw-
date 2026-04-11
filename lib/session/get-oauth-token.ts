@@ -5,7 +5,7 @@ import { users, accounts } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { decrypt } from '@/lib/crypto'
 
-type OAuthProvider = 'github' | 'vercel'
+type OAuthProvider = 'github' | 'vercel' | 'google' | 'email'
 
 /**
  * Get the OAuth access token for a user from the database

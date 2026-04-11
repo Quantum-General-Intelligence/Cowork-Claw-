@@ -17,10 +17,10 @@ export const users = pgTable(
     id: text('id').primaryKey(), // Internal user ID (we generate this)
     // Primary OAuth account info (how they signed in)
     provider: text('provider', {
-      enum: ['github', 'vercel'],
+      enum: ['github', 'vercel', 'google', 'email'],
     }).notNull(), // Primary auth provider
-    externalId: text('external_id').notNull(), // External ID from OAuth provider
-    accessToken: text('access_token').notNull(), // Encrypted OAuth access token
+    externalId: text('external_id').notNull(), // External ID from OAuth provider (Supabase Auth UUID)
+    accessToken: text('access_token'), // Encrypted OAuth access token (null for email/Supabase-managed users)
     refreshToken: text('refresh_token'), // Encrypted OAuth refresh token
     scope: text('scope'), // OAuth scope
     // Profile info
@@ -39,10 +39,10 @@ export const users = pgTable(
 )
 
 export const insertUserSchema = z.object({
-  id: z.string().optional(), // Auto-generated if not provided
-  provider: z.enum(['github', 'vercel']),
+  id: z.string().optional(),
+  provider: z.enum(['github', 'vercel', 'google', 'email']),
   externalId: z.string().min(1, 'External ID is required'),
-  accessToken: z.string(),
+  accessToken: z.string().nullable().optional(),
   refreshToken: z.string().optional(),
   scope: z.string().optional(),
   username: z.string().min(1, 'Username is required'),
@@ -56,9 +56,9 @@ export const insertUserSchema = z.object({
 
 export const selectUserSchema = z.object({
   id: z.string(),
-  provider: z.enum(['github', 'vercel']),
+  provider: z.enum(['github', 'vercel', 'google', 'email']),
   externalId: z.string(),
-  accessToken: z.string(),
+  accessToken: z.string().nullable(),
   refreshToken: z.string().nullable(),
   scope: z.string().nullable(),
   username: z.string(),

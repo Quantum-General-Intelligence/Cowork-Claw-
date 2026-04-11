@@ -6,6 +6,7 @@ import { sessionAtom, sessionInitializedAtom } from '@/lib/atoms/session'
 import { githubConnectionAtom, githubConnectionInitializedAtom } from '@/lib/atoms/github-connection'
 import type { SessionUserInfo } from '@/lib/session/types'
 import type { GitHubConnection } from '@/lib/atoms/github-connection'
+import { createClient } from '@/utils/supabase/client'
 
 export function SessionProvider() {
   const setSession = useSetAtom(sessionAtom)
@@ -14,6 +15,8 @@ export function SessionProvider() {
   const setGitHubInitialized = useSetAtom(githubConnectionInitializedAtom)
 
   useEffect(() => {
+    const supabase = createClient()
+
     const fetchSession = async () => {
       try {
         const response = await fetch('/api/auth/info')
@@ -46,15 +49,22 @@ export function SessionProvider() {
 
     fetchAll()
 
-    // Refresh both every minute
-    const interval = setInterval(fetchAll, 60000)
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session) {
+        fetchAll()
+      } else {
+        setSession({ user: undefined })
+        setInitialized(true)
+      }
+    })
 
-    // Refresh on focus
     const handleFocus = () => fetchAll()
     window.addEventListener('focus', handleFocus)
 
     return () => {
-      clearInterval(interval)
+      subscription.unsubscribe()
       window.removeEventListener('focus', handleFocus)
     }
   }, [setSession, setInitialized, setGitHubConnection, setGitHubInitialized])

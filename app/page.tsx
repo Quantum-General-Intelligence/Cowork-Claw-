@@ -8,7 +8,7 @@ export default async function Home() {
   const session = await getServerSession()
 
   if (!session?.user) {
-    redirect('/api/auth/signin/github')
+    redirect('/auth')
   }
 
   const stars = await getGitHubStars()

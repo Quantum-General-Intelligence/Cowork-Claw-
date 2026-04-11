@@ -1,10 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { type NextRequest, NextResponse } from 'next/server'
+import type { User } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
 
-export async function updateSession(request: NextRequest) {
+export async function updateSession(request: NextRequest): Promise<{ response: NextResponse; user: User | null }> {
   let supabaseResponse = NextResponse.next({
     request: {
       headers: request.headers,
@@ -26,7 +27,9 @@ export async function updateSession(request: NextRequest) {
     },
   })
 
-  await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-  return supabaseResponse
+  return { response: supabaseResponse, user }
 }

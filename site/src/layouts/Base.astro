@@ -1,5 +1,6 @@
 ---
 import '../styles/globals.css'
+import { ThemeToggle } from '../components/ThemeToggle'
 
 interface Props {
   title?: string
@@ -28,6 +29,17 @@ const APP_URL = 'https://app.cowork-claw.ai'
       rel="stylesheet"
     />
     <title>{title}</title>
+    <script is:inline>
+      ;(function () {
+        var t = localStorage.getItem('theme')
+        if (!t || t === 'system') {
+          if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+            document.documentElement.classList.add('dark')
+        } else if (t === 'dark') {
+          document.documentElement.classList.add('dark')
+        }
+      })()
+    </script>
   </head>
   <body class="min-h-dvh bg-background text-foreground antialiased">
     <!-- Nav -->
@@ -37,8 +49,9 @@ const APP_URL = 'https://app.cowork-claw.ai'
         <div class="flex items-center gap-4 sm:gap-6">
           <a href="/pricing" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Pricing</a>
           <a href="/features" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Features</a>
+          <ThemeToggle client:load />
           <a
-            href={`${APP_URL}/api/auth/signin/github`}
+            href={`${APP_URL}/auth`}
             class="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90 transition-opacity"
           >
             Sign In
