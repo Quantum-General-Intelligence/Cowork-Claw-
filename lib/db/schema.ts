@@ -99,6 +99,7 @@ export const tasks = pgTable('tasks', {
   sandboxId: text('sandbox_id'),
   agentSessionId: text('agent_session_id'),
   sandboxUrl: text('sandbox_url'),
+  templateSlug: text('template_slug'),
   previewUrl: text('preview_url'),
   prUrl: text('pr_url'),
   prNumber: integer('pr_number'),
@@ -330,6 +331,8 @@ export const keys = pgTable(
     value: text('value').notNull(), // Encrypted API key value
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
+    valid: boolean('valid').default(true),
+    lastValidatedAt: timestamp('last_validated_at'),
   },
   (table) => ({
     // Unique constraint: a user can only have one key per provider
@@ -645,3 +648,38 @@ export const waitlist = pgTable('waitlist', {
 })
 
 export type WaitlistEntry = typeof waitlist.$inferSelect
+
+// Workflow templates — pre-built office-cowork recipes
+export const workflowTemplates = pgTable('workflow_templates', {
+  id: text('id').primaryKey(),
+  slug: text('slug').notNull().unique(),
+  name: text('name').notNull(),
+  description: text('description'),
+  category: text('category').notNull().default('general'),
+  icon: text('icon').default('sparkles'),
+  agentTeamJson: jsonb('agent_team_json').$type<unknown[]>().default([]),
+  defaultPrompt: text('default_prompt').notNull(),
+  paramsSchema: jsonb('params_schema').$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+})
+
+export type WorkflowTemplate = typeof workflowTemplates.$inferSelect
+
+// Task artifacts — deliverables produced by office-cowork tasks
+export const taskArtifacts = pgTable('task_artifacts', {
+  id: text('id').primaryKey(),
+  taskId: text('task_id')
+    .notNull()
+    .references(() => tasks.id, { onDelete: 'cascade' }),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  filename: text('filename').notNull(),
+  mime: text('mime').notNull().default('application/octet-stream'),
+  size: integer('size').default(0),
+  path: text('path').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export type TaskArtifact = typeof taskArtifacts.$inferSelect
