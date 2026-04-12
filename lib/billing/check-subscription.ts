@@ -7,7 +7,8 @@ export interface UserPlan {
   planId: PlanId
   name: string
   dailyApiCalls: number
-  monthlySandboxMinutes: number
+  maxConcurrent: number
+  maxTaskMinutes: number
   status: string
   stripeSubscriptionId: string | null
 }
@@ -16,7 +17,8 @@ const DEFAULT_PLAN: UserPlan = {
   planId: 'hobby',
   name: 'No Plan',
   dailyApiCalls: 0,
-  monthlySandboxMinutes: 0,
+  maxConcurrent: 0,
+  maxTaskMinutes: 0,
   status: 'inactive',
   stripeSubscriptionId: null,
 }
@@ -39,7 +41,8 @@ export async function getUserPlan(userId: string): Promise<UserPlan> {
       planId,
       name: plan.name,
       dailyApiCalls: plan.dailyApiCalls,
-      monthlySandboxMinutes: plan.monthlySandboxMinutes,
+      maxConcurrent: plan.maxConcurrent,
+      maxTaskMinutes: plan.maxTaskMinutes,
       status: sub.status,
       stripeSubscriptionId: sub.stripeSubscriptionId,
     }

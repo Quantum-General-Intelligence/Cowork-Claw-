@@ -20,11 +20,11 @@ export default async function BillingPage() {
       planId={userPlan.planId}
       planName={userPlan.name}
       dailyLimit={userPlan.dailyApiCalls}
-      monthlyMinutes={userPlan.monthlySandboxMinutes}
+      maxConcurrent={userPlan.maxConcurrent}
+      maxTaskMinutes={userPlan.maxTaskMinutes}
       status={userPlan.status}
       hasStripeSubscription={!!userPlan.stripeSubscriptionId}
       todayApiCalls={usage.apiCalls ?? 0}
-      todaySandboxMinutes={usage.sandboxMinutes ?? 0}
     />
   )
 }

@@ -9,22 +9,22 @@ interface BillingClientProps {
   planId: string
   planName: string
   dailyLimit: number
-  monthlyMinutes: number
+  maxConcurrent: number
+  maxTaskMinutes: number
   status: string
   hasStripeSubscription: boolean
   todayApiCalls: number
-  todaySandboxMinutes: number
 }
 
 export function BillingClient({
   planId,
   planName,
   dailyLimit,
-  monthlyMinutes,
+  maxConcurrent,
+  maxTaskMinutes,
   status,
   hasStripeSubscription,
   todayApiCalls,
-  todaySandboxMinutes,
 }: BillingClientProps) {
   const [loading, setLoading] = useState(false)
   const isActive = hasStripeSubscription && status === 'active'
@@ -86,7 +86,7 @@ export function BillingClient({
               </div>
               <p className="text-2xl font-bold">{planName}</p>
               <p className="text-xs text-muted-foreground mt-1">
-                {dailyLimit} tasks/day &middot; {monthlyMinutes.toLocaleString()} sandbox minutes/month
+                {dailyLimit} tasks/day &middot; {maxConcurrent} concurrent &middot; {maxTaskMinutes} min max/task
               </p>
             </div>
             <Button variant="outline" size="sm" onClick={handleManage} disabled={loading}>
@@ -96,20 +96,13 @@ export function BillingClient({
 
           <div className="border rounded-lg p-4">
             <h2 className="text-sm font-medium mb-3">Usage Today</h2>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <p className="text-2xl font-bold">
                   {todayApiCalls}
                   <span className="text-sm font-normal text-muted-foreground"> / {dailyLimit}</span>
                 </p>
-                <p className="text-xs text-muted-foreground">Tasks used</p>
-              </div>
-              <div>
-                <p className="text-2xl font-bold">
-                  {todaySandboxMinutes}
-                  <span className="text-sm font-normal text-muted-foreground"> min</span>
-                </p>
-                <p className="text-xs text-muted-foreground">Sandbox time</p>
+                <p className="text-xs text-muted-foreground">Tasks used today</p>
               </div>
             </div>
           </div>
