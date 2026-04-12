@@ -1,23 +1,63 @@
 services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: cowork
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cowork}
+      POSTGRES_DB: cowork
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - /var/lib/cowork-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U cowork -d cowork']
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    network_mode: host
+    command:
+      - postgres
+      - -c
+      - listen_addresses=127.0.0.1
+      - -c
+      - max_connections=200
+      - -c
+      - shared_buffers=256MB
+
+  db-migrate:
+    build: .
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env.local
+    network_mode: host
+    restart: 'no'
+    command: ['pnpm', 'exec', 'tsx', 'scripts/db-migrate-and-seed.ts']
+
   cowork-claw:
     build: .
     restart: unless-stopped
     env_file: .env.local
     network_mode: host
+    depends_on:
+      postgres:
+        condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.cowork-claw.rule=Host(`app.cowork-claw.ai`)"
-      - "traefik.http.routers.cowork-claw.entrypoints=websecure"
-      - "traefik.http.routers.cowork-claw.tls.certresolver=letsencrypt"
-      - "traefik.http.services.cowork-claw.loadbalancer.server.url=http://127.0.0.1:3000"
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.cowork-claw.rule=Host(`app.cowork-claw.ai`)'
+      - 'traefik.http.routers.cowork-claw.entrypoints=websecure'
+      - 'traefik.http.routers.cowork-claw.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.cowork-claw.loadbalancer.server.url=http://127.0.0.1:3000'
 
   cowork-claw-site:
     build: ./site
     restart: unless-stopped
     network_mode: host
     labels:
-      - "traefik.enable=true"
-      - "traefik.http.routers.site.rule=Host(`cowork-claw.ai`) || Host(`www.cowork-claw.ai`)"
-      - "traefik.http.routers.site.entrypoints=websecure"
-      - "traefik.http.routers.site.tls.certresolver=letsencrypt"
-      - "traefik.http.services.site.loadbalancer.server.url=http://127.0.0.1:4321"
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.site.rule=Host(`cowork-claw.ai`) || Host(`www.cowork-claw.ai`)'
+      - 'traefik.http.routers.site.entrypoints=websecure'
+      - 'traefik.http.routers.site.tls.certresolver=letsencrypt'
+      - 'traefik.http.services.site.loadbalancer.server.url=http://127.0.0.1:4321'
