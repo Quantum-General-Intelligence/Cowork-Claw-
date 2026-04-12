@@ -14,7 +14,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "prepare": "husky"
+    "prepare": "husky",
+    "smoke:p1": "tsx scripts/smoke/00-sandbox-errors.ts && tsx scripts/smoke/01-docker-provider-contract.ts && tsx scripts/smoke/02-factory-parity.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.64",
