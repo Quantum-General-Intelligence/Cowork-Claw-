@@ -163,45 +163,90 @@ class DockerSandboxInstance implements SandboxInstance {
 
 export class DockerSandboxProvider implements SandboxProvider {
   async create(config: SandboxCreateConfig): Promise<SandboxInstance> {
+    // Pre-spawn: enforce global concurrency cap.
+    const sshConfig = getSSHConfig()
+    const { countCoworkSandboxes, getMaxConcurrentSandboxes } = await import('../concurrency')
+    const cap = getMaxConcurrentSandboxes()
+    const current = await countCoworkSandboxes(sshConfig)
+    if (current >= cap) {
+      const { SandboxCapError } = await import('../errors')
+      throw new SandboxCapError()
+    }
+
     const id = nanoid(10).toLowerCase()
     const containerName = `sandbox-${id}`
-    const image = config.runtime === 'node22' ? 'node:22' : `node:${config.runtime?.replace('node', '') || '22'}`
-    const ports = config.ports || [3000]
-    const cpus = config.resources?.vcpus || 4
 
-    // Build port mapping: expose on random host ports to avoid conflicts
+    // Image: prefer explicit config.image (office-cowork task), else fall back to node:<runtime>
+    const image =
+      config.image ?? (config.runtime === 'node22' ? 'node:22' : `node:${config.runtime?.replace('node', '') || '22'}`)
+
+    const ports = config.ports || [3000]
+    const vcpus = config.resources?.vcpus ?? 2
+    const memMb = config.resources?.memMb ?? 2048
+    const pids = config.resources?.pids ?? 512
+
     const portFlags = ports.map((p) => `-p ${p}`).join(' ')
 
-    // Create container with resource limits and git installed
+    // Env flags — passed as separate shell tokens. Values are SSH-escaped inline.
+    // IMPORTANT: never log envFlags or the final createCmd; they contain the user's Anthropic key.
+    const envFlags = config.env
+      ? Object.entries(config.env)
+          .map(([k, v]) => `-e ${k}='${v.replace(/'/g, "'\\''")}'`)
+          .join(' ')
+      : ''
+
+    // Artifact volume — host path is assumed to exist and be writable by the SSH user.
+    const volumeFlag = config.artifactVolume ? `-v '${config.artifactVolume.replace(/'/g, "'\\''")}:/out'` : ''
+
+    // Base create command. For the node:* fallback we keep the apt-get bootstrap;
+    // for cowork-claw/runner:latest the entrypoint already has everything.
+    const bootstrap =
+      image === 'node:22' || image.startsWith('node:')
+        ? `sh -c 'apt-get update -qq && apt-get install -y -qq git curl > /dev/null 2>&1; sleep infinity'`
+        : '' // runner image has its own ENTRYPOINT
+
     const createCmd = [
       `docker run -d --name ${containerName}`,
       portFlags,
-      `--memory=4g --cpus=${cpus}`,
+      `--memory=${memMb}m --cpus=${vcpus} --pids-limit=${pids}`,
       `--label cowork-claw=true`,
       `--label sandbox-id=${id}`,
+      envFlags,
+      volumeFlag,
       image,
-      `sh -c 'apt-get update -qq && apt-get install -y -qq git curl > /dev/null 2>&1; sleep infinity'`,
-    ].join(' ')
+      bootstrap,
+    ]
+      .filter((s) => s.length > 0)
+      .join(' ')
 
-    const createResult = await sshExecRetry(createCmd, 2, 60000)
+    let createResult: { exitCode: number; stdout: string; stderr: string }
+    try {
+      createResult = await sshExecRetry(createCmd, 2, 60000)
+    } catch {
+      const { SandboxStartError } = await import('../errors')
+      throw new SandboxStartError()
+    }
 
     if (createResult.exitCode !== 0) {
-      throw new Error(`Failed to create container: ${createResult.stderr}`)
+      const { SandboxStartError } = await import('../errors')
+      // Static log — do NOT include stderr (may contain env or paths).
+      console.error('Sandbox create failed')
+      throw new SandboxStartError()
     }
 
     const instance = new DockerSandboxInstance(id, ports)
 
-    // Wait for container to be ready (git installed)
-    for (let i = 0; i < 30; i++) {
-      const check = await sshExec(`docker exec ${containerName} which git 2>/dev/null`, 15000).catch(() => null)
-      if (check && check.exitCode === 0) break
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+    // Readiness probe — only for the node:* bootstrap path. Runner image is ready immediately.
+    if (bootstrap) {
+      for (let i = 0; i < 30; i++) {
+        const check = await sshExec(`docker exec ${containerName} which git 2>/dev/null`, 15000).catch(() => null)
+        if (check && check.exitCode === 0) break
+        await new Promise((resolve) => setTimeout(resolve, 2000))
+      }
+      await sshExecRetry(`docker exec ${containerName} mkdir -p /vercel/sandbox/project`)
     }
 
-    // Create project directory
-    await sshExecRetry(`docker exec ${containerName} mkdir -p /vercel/sandbox/project`)
-
-    // Clone repo if source provided
+    // Clone git source if requested (unchanged behaviour).
     if (config.source?.url) {
       const depthFlag = config.source.depth ? `--depth ${config.source.depth}` : ''
       const revisionFlag = config.source.revision ? `-b ${config.source.revision}` : ''
@@ -209,10 +254,9 @@ export class DockerSandboxProvider implements SandboxProvider {
       await sshExecRetry(cloneCmd, 2, 120000)
     }
 
-    // Set auto-cleanup timeout
+    // Auto-cleanup timer — unchanged.
     if (config.timeout) {
       const timeoutSec = Math.floor(config.timeout / 1000)
-      // Schedule cleanup in a detached background process
       await sshExec(
         `nohup sh -c 'sleep ${timeoutSec} && docker stop ${containerName} 2>/dev/null && docker rm ${containerName} 2>/dev/null' > /dev/null 2>&1 &`,
       )
@@ -223,18 +267,14 @@ export class DockerSandboxProvider implements SandboxProvider {
 
   async get(options: SandboxGetOptions): Promise<SandboxInstance> {
     const containerName = `sandbox-${options.sandboxId}`
-
-    // Check container exists and is running
     const result = await sshExecRetry(
       `docker inspect ${containerName} --format '{{.State.Running}}' 2>/dev/null`,
       2,
       10000,
     )
-
     if (result.exitCode !== 0 || result.stdout.trim() !== 'true') {
-      throw new Error(`Container ${containerName} not found or not running`)
+      throw new Error('Container not found or not running')
     }
-
     return new DockerSandboxInstance(options.sandboxId)
   }
 }

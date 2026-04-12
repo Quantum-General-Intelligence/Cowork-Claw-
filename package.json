@@ -14,7 +14,8 @@
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
-    "prepare": "husky"
+    "prepare": "husky",
+    "smoke:p1": "tsx scripts/smoke/00-sandbox-errors.ts && tsx scripts/smoke/01-docker-provider-contract.ts && tsx scripts/smoke/02-factory-parity.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.64",
@@ -43,7 +44,6 @@
     "@types/js-cookie": "^3.0.6",
     "@types/ws": "^8.18.1",
     "@vercel/analytics": "^1.6.1",
-    "@vercel/sandbox": "^0.0.21",
     "@vercel/sdk": "^1.18.7",
     "@vercel/speed-insights": "^1.3.1",
     "@xyflow/react": "^12.10.2",
