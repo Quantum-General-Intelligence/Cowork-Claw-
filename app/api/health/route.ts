@@ -1,51 +1,64 @@
+/**
+ * Health endpoint used by the external uptime monitor and by the /api/health
+ * line in the preflight checklist. Returns static booleans — no dynamic values,
+ * no IDs, no paths, per AGENTS.md.
+ */
 import { NextResponse } from 'next/server'
-import { db } from '@/lib/db/client'
-import { users } from '@/lib/db/schema'
-import { sql } from 'drizzle-orm'
+import postgres from 'postgres'
+import { getEnv } from '@/lib/env'
+import { countCoworkSandboxes } from '@/lib/sandbox/concurrency'
+import { statfsSync } from 'fs'
+
+export const dynamic = 'force-dynamic'
+
+async function checkDb(): Promise<boolean> {
+  try {
+    const env = getEnv()
+    const sql = postgres(env.POSTGRES_URL, { max: 1, connect_timeout: 2 })
+    try {
+      await sql`SELECT 1`
+      return true
+    } finally {
+      await sql.end({ timeout: 1 })
+    }
+  } catch {
+    return false
+  }
+}
+
+async function checkSshToDocker(): Promise<boolean> {
+  try {
+    const env = getEnv()
+    const keyPem = Buffer.from(env.SANDBOX_SSH_KEY, 'base64').toString('utf-8')
+    await countCoworkSandboxes({
+      host: env.SANDBOX_SSH_HOST,
+      port: env.SANDBOX_SSH_PORT,
+      username: env.SANDBOX_SSH_USER,
+      privateKey: keyPem,
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+function checkDiskFree(): boolean {
+  try {
+    const env = getEnv()
+    const stats = statfsSync(env.ARTIFACT_ROOT)
+    const freeBytes = Number(stats.bavail) * Number(stats.bsize)
+    return freeBytes > 2 * 1024 * 1024 * 1024
+  } catch {
+    return false
+  }
+}
 
 export async function GET() {
-  const checks: Record<string, { status: string; message?: string }> = {}
-
-  // Check database connectivity
-  try {
-    await db
-      .select({ count: sql`1` })
-      .from(users)
-      .limit(1)
-    checks.database = { status: 'ok' }
-  } catch (error) {
-    checks.database = { status: 'error', message: error instanceof Error ? error.message : 'DB unreachable' }
-  }
-
-  // Check sandbox provider configuration
-  const provider = process.env.SANDBOX_PROVIDER || (process.env.SANDBOX_SSH_HOST ? 'docker' : 'vercel')
-  if (provider === 'docker') {
-    checks.sandbox = process.env.SANDBOX_SSH_HOST
-      ? { status: 'ok', message: `Docker @ ${process.env.SANDBOX_SSH_HOST}` }
-      : { status: 'error', message: 'SANDBOX_SSH_HOST not set' }
-  } else {
-    checks.sandbox =
-      process.env.SANDBOX_VERCEL_TOKEN && process.env.SANDBOX_VERCEL_TEAM_ID
-        ? { status: 'ok', message: 'Vercel Sandbox' }
-        : { status: 'error', message: 'Vercel sandbox credentials missing' }
-  }
-
-  // Check API keys
-  const hasAnthropicKey = !!(process.env.AI_GATEWAY_API_KEY || process.env.ANTHROPIC_API_KEY)
-  checks.apiKeys = hasAnthropicKey
-    ? { status: 'ok' }
-    : { status: 'warning', message: 'No AI API keys configured — users must provide their own' }
-
-  // Check auth
-  const hasAuth = !!(process.env.NEXT_PUBLIC_GITHUB_CLIENT_ID || process.env.NEXT_PUBLIC_VERCEL_CLIENT_ID)
-  checks.auth = hasAuth ? { status: 'ok' } : { status: 'error', message: 'No OAuth provider configured' }
-
-  const hasErrors = Object.values(checks).some((c) => c.status === 'error')
-  const hasWarnings = Object.values(checks).some((c) => c.status === 'warning')
-
-  return NextResponse.json({
-    status: hasErrors ? 'error' : hasWarnings ? 'degraded' : 'ok',
-    checks,
-    timestamp: new Date().toISOString(),
-  })
+  const [db, sshToDocker] = await Promise.all([checkDb(), checkSshToDocker()])
+  const diskFree = checkDiskFree()
+  const ok = db && sshToDocker && diskFree
+  return NextResponse.json(
+    { ok, db, sshToDocker, diskFree },
+    { status: ok ? 200 : 503 },
+  )
 }
