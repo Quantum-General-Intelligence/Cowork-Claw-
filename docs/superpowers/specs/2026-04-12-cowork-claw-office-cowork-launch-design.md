@@ -27,8 +27,8 @@ Cowork-Claw is an **office-work cowork platform** for founders and solo operator
 ### 2.1 In scope for tomorrow
 
 - Full migration off `@vercel/sandbox` onto a self-hosted Docker-based sandbox running on a single VPS
-- A `sandbox-manager` service exposing the same interface the existing code uses for `@vercel/sandbox`, so the rest of the app is oblivious to the swap
-- A pre-built `cowork-claw/runner:latest` Docker image with Claude Code CLI and the other agent CLIs baked in
+- **Harden the existing `DockerSandboxProvider`** ([lib/sandbox/providers/docker.ts](lib/sandbox/providers/docker.ts)) which already implements the `SandboxProvider` interface and speaks SSH to a remote Docker host — no new `sandbox-manager` HTTP service is needed
+- A pre-built `cowork-claw/runner:latest` Docker image with Claude Code CLI and the other agent CLIs baked in, replacing the current `node:22` base
 - BYO-key onboarding flow (validate + encrypt + store)
 - 10 office-cowork templates (see §6.4) surfaced as a "template strip" above the existing chat/task-form landing state
 - Local artifact storage on the VPS with signed-URL downloads served by Next.js
@@ -81,26 +81,29 @@ Cowork-Claw is an **office-work cowork platform** for founders and solo operator
                          │  Docker Compose   │
                          └─────────┬─────────┘
                                    │
-              ┌────────────────────┼────────────────────┐
-              │                    │                    │
-     ┌────────▼────────┐ ┌─────────▼────────┐ ┌─────────▼────────┐
-     │  next-app       │ │ sandbox-manager  │ │   postgres       │
-     │  (Next.js 16)   │ │  (Docker-outside-│ │  (local, on VPS) │
-     │  Supabase auth  │ │   Docker host)   │ │                  │
-     │  Stripe         │ │                  │ │                  │
-     │  OpenClaw chat  │ │ spawns per-task  │ │                  │
-     │                 │ │ ephemeral        │ │                  │
-     │                 │ │ containers       │ │                  │
-     └────────┬────────┘ └─────────┬────────┘ └──────────────────┘
-              │                    │
-              │                    ▼
-              │         ┌──────────────────┐
-              │         │ task-runner-N    │  ← ephemeral, one per task
-              │         │ (user's prompt + │    - resource-limited
-              │         │  Claude Code CLI │    - auto-destroyed
-              │         │  runs with       │    - outputs to /out volume
-              │         │  user's key)     │
-              │         └──────────────────┘
+              ┌────────────────────┴──────────────┐
+              │                                   │
+     ┌────────▼────────┐               ┌──────────▼────────┐
+     │  next-app       │               │   postgres        │
+     │  (Next.js 16)   │               │  (local, on VPS)  │
+     │  Supabase auth  │               │                   │
+     │  Stripe         │               └───────────────────┘
+     │  OpenClaw chat  │
+     │                 │
+     │  DockerSandbox  │ ── SSH ──┐
+     │  Provider       │          │
+     └────────┬────────┘          │
+              │                   ▼
+              │         ┌──────────────────────────┐
+              │         │ dockerd (same VPS via    │
+              │         │  SSH to localhost, OR a  │
+              │         │  dedicated docker host)  │
+              │         │                          │
+              │         │  task-runner-N           │ ← ephemeral
+              │         │  (Claude Code CLI + user │    - resource-limited
+              │         │   Anthropic key + params │    - auto-destroyed
+              │         │   writes to /out volume) │    - --label cowork-claw=true
+              │         └──────────────────────────┘
               │
               ▼
        ┌──────────────┐
@@ -113,13 +116,14 @@ Cowork-Claw is an **office-work cowork platform** for founders and solo operator
 ### 3.2 Architectural decisions
 
 1. **Single VPS, Docker Compose, no Kubernetes.** Tomorrow = one box. Multi-VPS segmentation by client is v2.
-2. **`sandbox-manager` is a separate container**, not inlined into the Next.js process. Reasons: a Next.js restart must not kill running tasks; the Docker socket should not be mounted into the web-facing process; restart semantics (§7.5–7.6) depend on the two processes being independent.
-3. **Pre-built `task-runner` image**, not per-task image builds. One image ships with all agent CLIs at pinned versions. No auto-updates on launch day.
-4. **BYO-key flow** is DB → Next handler → sandbox-manager → container env. Key never touches disk in the container, never appears in any log.
+2. **Reuse the existing `DockerSandboxProvider`** ([lib/sandbox/providers/docker.ts](lib/sandbox/providers/docker.ts)). It already speaks SSH to a remote Docker host and implements the full `SandboxProvider` interface the rest of the app uses. No separate `sandbox-manager` HTTP service, no Docker socket mounted into the web-facing process — the SSH connection *is* the remote-control channel. This is simpler than a separate service and already written.
+3. **Pre-built `task-runner` image**, not per-task image builds. One image ships with all agent CLIs at pinned versions. No auto-updates on launch day. Replaces the current `node:22` default in `docker.ts`.
+4. **BYO-key flow** is DB → Next handler → `DockerSandboxProvider.create()` → `docker run -e ANTHROPIC_API_KEY` over SSH. Key never touches disk in the container, never appears in any log.
 5. **Local Postgres on the VPS** (not Neon). Removes an external dependency and latency hop. Neon can be re-adopted later if multi-VPS demands it.
 6. **Workflow templates are DB seed data** in a new `workflow_templates` table, not hardcoded in TypeScript. Adding templates post-launch is a seed-script run, not a redeploy.
-7. **No job queue.** Tasks run via direct HTTP from Next handler → sandbox-manager. Crashes mid-task = failed task, user retries.
-8. **Explicit v2 deferrals:** hardened isolation, autoscale, durable queue, multi-VPS.
+7. **No job queue.** Next handler calls `DockerSandboxProvider.create()` synchronously, then returns a task ID. Progress is streamed by polling `runCommand` output or via a log file the runner writes to `/out`. Crashes mid-task = failed task, user retries.
+8. **Concurrency enforcement** happens in the Next task-creation route (it knows the user's tier), plus a global cap enforced by counting containers with `--label cowork-claw=true` before spawning.
+9. **Explicit v2 deferrals:** hardened isolation, autoscale, durable queue, multi-VPS, splitting the docker host off to a separate machine.
 
 ---
 
@@ -131,7 +135,9 @@ Cowork-Claw is an **office-work cowork platform** for founders and solo operator
 | 2 | Supabase auth + paid-gate middleware | Keep |
 | 3 | Stripe checkout + pricing | Keep; add 4 price IDs |
 | 4 | Drizzle schema + migrations | Keep; add `workflow_templates`, `task_artifacts` tables |
-| 5 | `@vercel/sandbox` | **Scrap** |
+| 5 | `@vercel/sandbox` + `lib/sandbox/providers/vercel.ts` | **Scrap** |
+| 5b | `lib/sandbox/providers/docker.ts` | **Keep & harden** (already exists, already SSH-based — needs per-tier resource caps, pids-limit, `/out` volume, `ANTHROPIC_API_KEY` env, base image swap to `cowork-claw/runner:latest`, global concurrency cap) |
+| 5c | `lib/sandbox/factory.ts` | **Simplify** — drop the vercel branch, default to docker unconditionally |
 | 6 | Task form + agent picker | Keep; still accessible |
 | 7 | Chat with OpenClaw | Keep; primary surface |
 | 8 | Workflow builder (xyflow) | Keep; not hidden, remains the "peek under the hood" view |
@@ -160,21 +166,18 @@ Cowork-Claw is an **office-work cowork platform** for founders and solo operator
 
 ## 6. Components
 
-### 6.1 `sandbox-manager` (NEW — critical path)
+### 6.1 `DockerSandboxProvider` hardening (EXISTING file, modified)
 
-- **Purpose:** HTTP service that creates, inspects, streams from, sends input to, and destroys task-runner containers via the host Docker socket.
-- **Interface** (must match the surface `@vercel/sandbox` currently exposes to the existing code):
-  - `POST /sandboxes` → `create({ image, envs, timeoutMs, resources }) → { id }`
-  - `POST /sandboxes/:id/exec` → streams `{ stdout, stderr, exit }`
-  - `POST /sandboxes/:id/files` → `writeFile(path, contents)`
-  - `GET /sandboxes/:id/files?path=...` → `readFile(path)`
-  - `DELETE /sandboxes/:id` → `destroy()`
-  - `GET /sandboxes` → `list()`
-  - `POST /events/:taskId` → progress events from inside the runner
-  - `GET /sandboxes/:id/stream` → SSE of progress events for the client
-- **Dependencies:** Docker socket (`-v /var/run/docker.sock:/var/run/docker.sock`), Postgres (for `container_id ↔ task_id` mapping), `cowork-claw/runner:latest` image locally available.
-- **Authentication:** shared-secret header (`X-SBX-SECRET`) on every call; secret lives in the same env file as the rest of the app. Not TLS internally because both services are on the same host behind Cloudflare.
-- **Concurrency:** tracks a global `MAX_CONCURRENT_SANDBOXES` (default `8`), rejects with `429 CW-SBX01` above cap.
+- **File:** [lib/sandbox/providers/docker.ts](lib/sandbox/providers/docker.ts) — already implements `SandboxProvider` and speaks SSH to a remote Docker host.
+- **Current state (already works):** nanoid-based container naming, labeled with `cowork-claw=true`, configurable port mapping, `--memory=4g --cpus=<vcpus>`, git install, repo clone, background cleanup timer, `stop()`, `get()`.
+- **Changes for launch:**
+  1. Replace the default base image from `node:<runtime>` to `cowork-claw/runner:latest` when `config.source` indicates a task (not a classic dev-sandbox). Keep the node-image path for backward compatibility with the task-form flow.
+  2. Lower default resource caps from `--memory=4g --cpus=4` to `--memory=2g --cpus=2` and add `--pids-limit=512`. Tier-specific caps come from the Next task route and are passed into `config.resources`.
+  3. Mount a host artifact volume: `-v /var/lib/cowork-artifacts/<sandbox_id>:/out`. The host directory is created by the Next task route before calling `create()`.
+  4. Pass the user's Anthropic key as `-e ANTHROPIC_API_KEY=<key>` via `config.env` (add `env` to `SandboxCreateConfig` in `provider.ts`).
+  5. Add a pre-spawn global concurrency check: `docker ps --filter label=cowork-claw=true -q | wc -l` over SSH; if ≥ `MAX_CONCURRENT_SANDBOXES` (env, default `8`), throw a sentinel error `SandboxCapError` that the Next route converts into a `429 CW-SBX01`.
+  6. Add static-only logging per `AGENTS.md` — no container names, no paths, no keys in any log line.
+- **No HTTP service, no separate container, no Docker socket mount in the web-facing process.** The SSH connection is the remote-control channel.
 
 ### 6.2 `task-runner` image (NEW — built once)
 
@@ -190,11 +193,11 @@ Cowork-Claw is an **office-work cowork platform** for founders and solo operator
 - **Versioning:** `cowork-claw/runner:<semver>` tags; `:latest` is set during deploy. Do **not** auto-update CLIs on launch day.
 - **Image size budget:** < 2GB. If it grows past that, the pre-launch pull on the VPS becomes a risk; revisit slimness.
 
-### 6.3 `lib/sandbox/client.ts` (NEW — the swap-in)
+### 6.3 `lib/sandbox/factory.ts` simplification (EXISTING file, modified)
 
-- **Purpose:** thin HTTP client that exposes the exact same surface as `@vercel/sandbox`, so every current call site changes by one import line only.
-- **Implementation:** `fetch` wrapper with the shared-secret header, returning objects shaped identically to `@vercel/sandbox`'s returns.
-- **Test obligation:** Smoke Test 2 (§10.2) verifies parity. This is the single most important test.
+- **Purpose:** the factory currently picks between `DockerSandboxProvider` and `VercelSandboxProvider` based on env. After launch, docker is the only provider.
+- **Change:** delete the vercel branch entirely and always return `DockerSandboxProvider`. Delete `providers/vercel.ts`. Remove `@vercel/sandbox` from `package.json`. Remove `SANDBOX_VERCEL_*` env references from runtime code (keep them in `.env.example` for one release as a deprecation note, then drop).
+- **Test obligation:** Smoke Test 2 (§10.2) verifies the provider interface still works end-to-end after the delete.
 
 ### 6.4 Workflow Templates — seed data + UI strip (NEW — minimal)
 
@@ -256,9 +259,10 @@ Cowork-Claw is an **office-work cowork platform** for founders and solo operator
 `docker-compose.prod.yml` gains:
 
 - `postgres` service (local persistence under `/var/lib/cowork-pg/`)
-- `sandbox-manager` service with Docker socket mount and `cowork-net` network
 - `db-migrate` one-shot service that runs Drizzle migrations + `db:seed:templates` on boot
-- `next-app` service updated to depend on `postgres` and `sandbox-manager`
+- `next-app` service updated to depend on `postgres` and to receive SSH credentials (`SANDBOX_SSH_HOST`, `SANDBOX_SSH_KEY`, `SANDBOX_SSH_USER`, `SANDBOX_SSH_PORT`) as env vars
+- **No `sandbox-manager` service.** The runner containers are launched via SSH directly from `next-app` through `DockerSandboxProvider`.
+- **Docker host for runners:** two options, pick one during P1 — (a) SSH to `localhost`/`host.docker.internal` so `next-app` launches sibling containers on the same VPS, or (b) a dedicated docker host VM reached over the private network. For tomorrow, (a) is simplest; (b) is a v2 split when you want to isolate runners from the web tier.
 
 ### 6.11 Components explicitly not touched
 
@@ -271,10 +275,10 @@ Supabase auth, Stripe backend code, middleware paid-gate, OpenClaw chat logic, w
 ### 7.1 Happy-path lifecycle ("Pitch deck builder")
 
 1. **Browser**: user (signed-in, paid, key set) clicks the "Pitch deck builder" tile; a modal opens with fields from `params_schema`.
-2. **Next.js `POST /api/tasks`**: auth check, paid-gate check, daily-limit check, concurrency-cap check, fetches and decrypts the user's Anthropic key, renders `default_prompt` with user params, inserts a `tasks` row with `status='queued'`, calls `sandboxClient.create()`.
-3. **sandbox-manager**: pulls `cowork-claw/runner:latest` if missing, `docker run -d --rm --name task-<id> --memory=2g --cpus=2 --pids-limit=512 --network=cowork-net -e ANTHROPIC_API_KEY -e TASK_ID -e TEMPLATE_SLUG -e PARAMS_JSON -v /var/lib/cowork-artifacts/<task_id>:/out cowork-claw/runner:latest`, stores `container_id ↔ task_id` in Postgres, returns `{ id }`.
-4. **task-runner**: entrypoint reads env, invokes Claude Code CLI in headless mode with the template's agent-team spec, writes deliverables to `/out`, streams progress events back to sandbox-manager, exits 0.
-5. **sandbox-manager**: writes progress events to `task_logs`, streams to any connected SSE client, on container exit scans `/var/lib/cowork-artifacts/<task_id>/`, inserts `task_artifacts` rows, updates the task to `completed`, emits a final SSE `done` event.
+2. **Next.js `POST /api/tasks`**: auth check, paid-gate check, daily-limit check, per-tier concurrency-cap check, fetches and decrypts the user's Anthropic key, renders `default_prompt` with user params, inserts a `tasks` row with `status='queued'`, calls `getSandboxProvider().create({ image: 'cowork-claw/runner:latest', env: { ANTHROPIC_API_KEY, TASK_ID, TEMPLATE_SLUG, PARAMS_JSON }, resources: { vcpus: 2, memMb: 2048 }, artifactVolume: '/var/lib/cowork-artifacts/<sandbox_id>', timeout: tierMaxTaskMs })`.
+3. **`DockerSandboxProvider.create()`** (running inside `next-app`): over SSH runs the global concurrency check, then `docker run -d --name sandbox-<id> --label cowork-claw=true --memory=2g --cpus=2 --pids-limit=512 -e ANTHROPIC_API_KEY -e TASK_ID -e TEMPLATE_SLUG -e PARAMS_JSON -v /var/lib/cowork-artifacts/<id>:/out cowork-claw/runner:latest`, schedules the cleanup timer, returns a `DockerSandboxInstance`. The Next route updates the task row with `sandbox_id=<id>` and `status='running'`.
+4. **task-runner**: entrypoint reads env, invokes Claude Code CLI in headless mode with the template's agent-team spec, writes deliverables to `/out`, appends progress lines to `/out/progress.log`, exits 0.
+5. **Next.js progress streaming**: the task's SSE endpoint (`/api/tasks/:id/stream`) tails `/out/progress.log` over SSH (`docker exec sandbox-<id> tail -f /out/progress.log`) and forwards lines to the browser. On container exit, the endpoint scans `/var/lib/cowork-artifacts/<id>/`, inserts `task_artifacts` rows, updates the task to `completed`, emits a final SSE `done` event.
 6. **Browser**: swaps the progress view for "Deliverable ready", shows signed-URL download buttons, shows inline preview, offers "Refine" (new task) and "Start new" actions.
 
 ### 7.2 Where the user's Anthropic key lives
@@ -282,11 +286,11 @@ Supabase auth, Stripe backend code, middleware paid-gate, OpenClaw chat logic, w
 | Step | Location |
 |---|---|
 | At rest | `keys` table, AES-256-GCM with `ENCRYPTION_KEY` |
-| In Next handler | Local variable for the duration of `sandboxClient.create()` only |
-| In transit Next → sandbox-manager | Over `cowork-net` Docker network, shared-secret header. Not TLS internally; key never leaves the VPS. |
-| In sandbox-manager | Held only long enough to pass as `-e ANTHROPIC_API_KEY` to `docker run`. Never written to disk. |
+| In Next handler | Local variable for the duration of `getSandboxProvider().create()` only |
+| In transit Next → dockerd | Over the SSH session to the docker host, inside a `docker run -e ANTHROPIC_API_KEY=<key>` shell command. SSH provides the encryption; the key never leaves the VPS (or the private network, if the docker host is on a separate box). |
+| In dockerd | Passed through to the container as an env var. Never written to disk by docker itself. |
 | In task-runner | Process env var on the Claude Code CLI process. Dies with the container. |
-| In any log | **Never.** Static log messages only, per `AGENTS.md`. |
+| In any log | **Never.** Static log messages only, per `AGENTS.md`. The SSH command string that contains the env var must be built in-memory and never logged or echoed. |
 
 ### 7.3 Variations by template
 
@@ -304,18 +308,19 @@ Supabase auth, Stripe backend code, middleware paid-gate, OpenClaw chat logic, w
 
 ### 7.5 Next.js restart mid-task
 
-- Runner keeps running (owned by sandbox-manager).
-- Browser's SSE drops; on reconnect, `GET /api/tasks/<id>` → re-opens SSE via sandbox-manager, which has been buffering.
-- Net effect: short reconnect, no task loss.
+- Runner container keeps running (owned by dockerd, not by `next-app`). The SSH session for progress streaming dies with the Next process, but the container does not.
+- Browser's SSE drops; on reconnect, `GET /api/tasks/<id>/stream` opens a fresh SSH `docker exec ... tail -f /out/progress.log` on the docker host, which picks up from the current file position (file survives the outage).
+- On Next boot, a reconciliation pass queries Postgres for tasks in `status='running'` and for each one runs `docker inspect sandbox-<id>` over SSH:
+  - Container still running → do nothing; SSE will reattach on next browser request.
+  - Container exited while down → scan `/out/`, register artifacts, mark `completed` or `failed` based on exit code.
+  - Container missing (killed by cleanup timer past its TTL) → scan `/out/`, register any artifacts, mark `completed` if `/out/progress.log` shows a clean finish line, else `failed`.
+- Net effect: short reconnect, no task loss in the common case.
 
-### 7.6 sandbox-manager restart mid-task
+### 7.6 dockerd / docker host restart mid-task
 
-- Running containers are orphaned but still executing.
-- On boot, sandbox-manager queries Postgres for `status='running'` tasks and reconciles against `docker ps`:
-  - Container still running → re-attach event streams.
-  - Container exited cleanly while down → scan `/out/`, register artifacts, mark `completed`.
-  - Container missing → mark `failed`.
-- **Accepted edge case:** sandbox-manager AND the container dying inside the same outage window = task marked `failed`, user retries.
+- All running containers die. Any task that was mid-run is unrecoverable.
+- On next Next boot, the reconciliation pass from §7.5 marks any `status='running'` task with a missing container as `failed`.
+- **Accepted edge case:** docker host reboot during a task = that task is `failed`, user retries. Durable queue and crash-safe recovery are v2.
 
 ---
 
@@ -328,8 +333,8 @@ Supabase auth, Stripe backend code, middleware paid-gate, OpenClaw chat logic, w
 | E1 | Auth / payment | Supabase middleware | "Sign in" / "Subscribe to continue" | Redirect |
 | E2 | BYO-key missing/invalid | Onboarding + pre-task | "Add your Anthropic key to start" | Redirect to `/onboarding/key` |
 | E3 | Daily / concurrency cap | Task route | "You've hit your plan limit. Upgrade or wait." | 429 `CW-TASK03` |
-| E4 | Global sandbox cap | sandbox-manager | "We're at capacity — please retry in a minute." | 429 `CW-SBX01` |
-| E5 | Container failed to start | sandbox-manager | "We couldn't start your task. Try again." | Task `failed`, auto-retry once |
+| E4 | Global sandbox cap | `DockerSandboxProvider.create()` (pre-spawn check) | "We're at capacity — please retry in a minute." | 429 `CW-SBX01` |
+| E5 | Container failed to start | `DockerSandboxProvider.create()` | "We couldn't start your task. Try again." | Task `failed`, auto-retry once |
 | E6a | Anthropic 429/5xx | runner via Claude CLI | "Upstream was flaky. Retrying…" | CLI auto-retries up to 3× |
 | E6b | Anthropic 401/403 | runner via Claude CLI | "Your Anthropic key was rejected. Check your key and try again." | Flip key `valid=false`, route to onboarding |
 | E7 | Task timeout | sandbox-manager watcher | "This task ran longer than your plan allows. Upgrade for longer runs." | `docker stop`, task `timeout` |
@@ -337,8 +342,8 @@ Supabase auth, Stripe backend code, middleware paid-gate, OpenClaw chat logic, w
 | E9 | Artifact URL expired | Next | "This download link has expired. Open the task to get a fresh link." | 410 |
 | E10 | DB unavailable | any | "Something went wrong. Please retry." | 503, server-side stack log |
 | E11 | Next.js crash mid-task | process | (see §7.5) | Runner continues |
-| E12 | sandbox-manager crash | process | (see §7.6) | Reconcile on boot |
-| E13 | Artifact volume full | sandbox-manager spawn | Same as E4 | Cleanup job + 80% disk block |
+| E12 | docker host crash | process | (see §7.6) | Reconcile on Next boot, affected tasks marked `failed` |
+| E13 | Artifact volume full | `DockerSandboxProvider.create()` pre-spawn disk check | Same as E4 | Cleanup job + 80% disk block |
 | E14 | Egress failure | runner | Template-specific: "Couldn't reach the web. Retry." | Task `failed` |
 | E15 | User cancel | browser → sandbox-manager | "Task cancelled." | `docker stop`, task `cancelled`, slot not refunded |
 | E16 | Stripe webhook race | middleware | "Finalizing your subscription…" | Auto-retry 2–3s |
@@ -351,7 +356,7 @@ Supabase auth, Stripe backend code, middleware paid-gate, OpenClaw chat logic, w
 
 | Class | Retry? | How |
 |---|---|---|
-| E5 | Yes, once, 2s backoff, in sandbox-manager | Transient Docker issues |
+| E5 | Yes, once, 2s backoff, in `DockerSandboxProvider.create()` | Transient Docker issues |
 | E6a | Yes, up to 3× expo backoff, in the Claude CLI | Upstream flakiness |
 | E6b | No | User must fix key |
 | E10 (reads) | Yes, once | Transient DB hiccup |
@@ -361,9 +366,9 @@ Supabase auth, Stripe backend code, middleware paid-gate, OpenClaw chat logic, w
 
 ### 8.4 Observability (minimum viable)
 
-- `docker logs -f` on each container, tailed manually during launch
+- `docker logs -f next-app` and `docker logs -f postgres` tailed manually during launch
 - `task_logs` table, visible in the progress UI and in Drizzle Studio
-- `GET /api/health` returning `{ db, sandboxManager, diskFree }` for an external uptime pinger (UptimeRobot or equivalent)
+- `GET /api/health` returning `{ db, sshToDocker, diskFree }` for an external uptime pinger (UptimeRobot or equivalent) — the `sshToDocker` probe opens a cached SSH connection and runs `docker info` with a 2s timeout
 - Error codes grep-able across all containers
 - Metrics stack deferred to v2
 
@@ -414,8 +419,8 @@ Migrations are run by the `db-migrate` one-shot service on every deploy, followe
 
 ### 10.2 Smoke tests (the full list)
 
-1. **sandbox-manager contract** — `POST /sandboxes` with a trivial runner job that writes `hi.txt`; assert container runs, exits, file exists, task row is `completed`, container gone.
-2. **`lib/sandbox/client.ts` parity** — call `create → exec → readFile → destroy`; assert each method returns the shape the existing task-runner code expects. *Most important test.*
+1. **`DockerSandboxProvider` contract** — import the provider directly, call `create({ image: 'cowork-claw/runner:latest', env: { ... }, resources, artifactVolume })`, assert an instance is returned, the container runs over SSH, writes a known file to `/out`, `stop()` succeeds, no orphaned containers remain.
+2. **Factory + interface parity** — call `getSandboxProvider()` from the same entry point the app uses; run `create → runCommand → stop`; assert each method returns the shape existing call sites expect (no regressions after removing the vercel branch). *Most important test — protects every existing call site.*
 3. **End-to-end template: "Landing page copy from a brief"** — cheapest Anthropic cost; seed a test user with a real key, POST `/api/tasks`, poll until `completed`, assert the artifact is non-empty and >200 chars. ~$0.05 per run.
 4. **Onboarding gate** — no-key user hits `/app` → redirected; invalid key rejected; valid key accepted; `/app` no longer redirects.
 5. **Tier limits & concurrency caps** — Hobby user submits 6 tasks rapidly; first runs, rest 429; with `MAX_CONCURRENT_SANDBOXES=2` set for the test, the 3rd concurrent task is rejected across all users.
@@ -429,7 +434,7 @@ Migrations are run by the `db-migrate` one-shot service on every deploy, followe
 - [ ] Click "Pitch deck builder" → fill params → Start → progress visible → real `.pptx` downloads
 - [ ] Cancel a running task → goes to `cancelled`, container gone
 - [ ] `GET /api/health` returns all `ok`
-- [ ] `docker stats` shows sandbox-manager < 500MB idle
+- [ ] `docker stats` shows `next-app` < 800MB idle and no runaway runner containers
 - [ ] `df -h /var/lib/cowork-artifacts` > 20GB free
 - [ ] UptimeRobot (or equivalent) polling `/api/health` every minute
 - [ ] Anthropic usage dashboard open in a tab
@@ -454,7 +459,7 @@ Failure response: vertically upgrade the Hetzner box (~5 minutes), re-run, proce
 ### 10.5 Post-launch monitoring (first 4 hours)
 
 - Terminal 1: `docker logs -f next-app` filtered for `CW-`
-- Terminal 2: `docker logs -f sandbox-manager` filtered for `CW-`
+- Terminal 2: `ssh <docker-host> 'docker ps --filter label=cowork-claw=true'` on a 5s watch
 - Terminal 3: `watch -n 5 'docker ps && df -h /var/lib/cowork-artifacts && free -h'`
 - Browser 1: Stripe dashboard (live payments)
 - Browser 2: `/api/health` on auto-refresh
@@ -481,11 +486,11 @@ No unit tests, no Playwright / browser e2e automation, no chaos / fault injectio
 - **Static logs only**, per `AGENTS.md`. Enforced by code review and by `redactSensitiveInfo()` as a backup.
 - **Key encryption at rest** via existing `ENCRYPTION_KEY` util. No plaintext keys anywhere on disk.
 - **Signed URLs** for artifacts (1-hour expiry, HMAC over id + exp).
-- **Shared-secret header** between Next and sandbox-manager; same-host only, never exposed through Cloudflare.
+- **SSH-only access** from `next-app` to the docker host; keys live in env (`SANDBOX_SSH_KEY`, base64-encoded), never exposed through Cloudflare. Consider binding dockerd to localhost and SSH-tunneling via the VPS's private network only.
 - **Cloudflare rate-limit** on `/api/tasks` as a coarse DoS cushion.
 - **Soft isolation** for day one (per-container cpu/mem/pids limits, no nested virt). Hardened isolation is v2.
 - **Runner containers have outbound internet** by default; egress allowlists are v2.
-- **Docker socket** is mounted only into sandbox-manager, never into the web-facing Next container.
+- **Docker socket** is not mounted into any container. All Docker operations go through SSH to the docker host.
 
 ---
 
