@@ -6,48 +6,54 @@ set -eu
 #   TASK_ID            — server-assigned task id
 #   TEMPLATE_SLUG      — which office-cowork template to run
 #   PARAMS_JSON        — JSON-encoded template parameters
+#   TASK_PROMPT        — the fully rendered prompt (template + params merged)
 #
 # On success the runner writes deliverables to /out and exits 0.
-# Progress lines are appended to /out/progress.log for Next.js to tail over SSH.
+# Progress lines are appended to /out/progress.log for the UI to stream.
 
 PROGRESS=/out/progress.log
 mkdir -p /out
 : > "$PROGRESS"
 
 log() {
-  # Static prefix only — never echo env values.
   printf '[runner] %s\n' "$1" | tee -a "$PROGRESS"
 }
 
 log "boot"
 
 if [ -z "${ANTHROPIC_API_KEY:-}" ]; then
-  log "missing key"
+  log "error: missing API key"
   exit 64
 fi
-if [ -z "${TEMPLATE_SLUG:-}" ]; then
-  log "missing template"
-  exit 65
-fi
 
-log "starting claude-code"
+PROMPT="${TASK_PROMPT:-${PARAMS_JSON:-Produce a brief summary document.}}"
 
-# Placeholder: subsequent plans (P4 templates) will wire the template_slug to a
-# concrete claude-code invocation. For P1 we only prove the image runs, so we
-# ask claude-code to produce a trivial deliverable.
-PROMPT="${PARAMS_JSON:-hello}"
-OUT_FILE=/out/result.md
+log "starting agent"
 
-if command -v claude-code >/dev/null 2>&1; then
-  claude-code --print --output "$OUT_FILE" "$PROMPT" >> "$PROGRESS" 2>&1 || {
-    log "claude-code failed"
-    exit 66
+# Use claude CLI in print mode (non-interactive, outputs to stdout)
+# --output-format text ensures clean text output
+# All deliverables should be written to /out/ by the agent
+claude --print \
+  --allowedTools "computer,bash,edit,write" \
+  --output-format text \
+  "$PROMPT
+
+IMPORTANT INSTRUCTIONS FOR THE AGENT:
+- Write ALL deliverable files to the /out/ directory
+- Create a /out/progress.log file and append status updates to it
+- Common deliverable formats: .md, .txt, .csv, .json
+- When done, ensure all files are in /out/
+- Do NOT ask interactive questions — work autonomously with the information provided" \
+  >> "$PROGRESS" 2>&1 || {
+    EXIT_CODE=$?
+    log "agent exited with code $EXIT_CODE"
+    # Still check if deliverables were produced despite non-zero exit
+    if ls /out/*.md /out/*.txt /out/*.csv /out/*.json /out/*.html 2>/dev/null | head -1 > /dev/null 2>&1; then
+      log "deliverables found despite error, marking success"
+      exit 0
+    fi
+    exit $EXIT_CODE
   }
-else
-  # P1 smoke fallback — if the CLI isn't available for any reason, still write
-  # a file so the contract test can assert success.
-  printf 'runner-smoke-ok\n' > "$OUT_FILE"
-fi
 
 log "done"
 exit 0
