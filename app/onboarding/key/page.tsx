@@ -51,11 +51,7 @@ export default function OnboardingKeyPage() {
             onChange={(e) => setApiKey(e.target.value)}
             disabled={status === 'validating'}
           />
-          <Button
-            className="w-full"
-            onClick={validate}
-            disabled={apiKey.length < 10 || status === 'validating'}
-          >
+          <Button className="w-full" onClick={validate} disabled={apiKey.length < 10 || status === 'validating'}>
             {status === 'validating'
               ? 'Validating...'
               : status === 'valid'

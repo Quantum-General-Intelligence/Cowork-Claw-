@@ -23,8 +23,7 @@ async function main() {
   // The artifact volume must exist on the docker host, not on the machine running this script.
   // For a single-VPS setup where the script runs on the same host as dockerd, we can use a host path.
   // For a remote docker host, set SMOKE_ARTIFACT_VOLUME to a path that exists there.
-  const artifactVolume =
-    process.env.SMOKE_ARTIFACT_VOLUME || `/tmp/cowork-smoke-${Date.now()}`
+  const artifactVolume = process.env.SMOKE_ARTIFACT_VOLUME || `/tmp/cowork-smoke-${Date.now()}`
 
   console.log('Creating sandbox with runner image...')
   const sandbox = await provider.create({

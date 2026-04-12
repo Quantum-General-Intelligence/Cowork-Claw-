@@ -37,11 +37,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
   }
 
   try {
-    const [artifact] = await db
-      .select()
-      .from(taskArtifacts)
-      .where(eq(taskArtifacts.id, id))
-      .limit(1)
+    const [artifact] = await db.select().from(taskArtifacts).where(eq(taskArtifacts.id, id)).limit(1)
 
     if (!artifact) {
       return NextResponse.json({ error: 'Artifact not found' }, { status: 404 })

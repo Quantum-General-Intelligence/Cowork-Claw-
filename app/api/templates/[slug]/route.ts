@@ -10,11 +10,7 @@ interface RouteParams {
 export async function GET(_req: NextRequest, { params }: RouteParams) {
   const { slug } = await params
   try {
-    const [template] = await db
-      .select()
-      .from(workflowTemplates)
-      .where(eq(workflowTemplates.slug, slug))
-      .limit(1)
+    const [template] = await db.select().from(workflowTemplates).where(eq(workflowTemplates.slug, slug)).limit(1)
 
     if (!template) {
       return NextResponse.json({ error: 'Template not found' }, { status: 404 })

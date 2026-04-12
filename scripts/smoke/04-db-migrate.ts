@@ -29,12 +29,19 @@ async function main() {
 
   console.log('Starting throwaway postgres...')
   const start = sh('docker', [
-    'run', '-d', '--rm',
-    '--name', name,
-    '-e', 'POSTGRES_USER=cowork',
-    '-e', 'POSTGRES_PASSWORD=cowork',
-    '-e', 'POSTGRES_DB=cowork',
-    '-p', `${port}:5432`,
+    'run',
+    '-d',
+    '--rm',
+    '--name',
+    name,
+    '-e',
+    'POSTGRES_USER=cowork',
+    '-e',
+    'POSTGRES_PASSWORD=cowork',
+    '-e',
+    'POSTGRES_DB=cowork',
+    '-p',
+    `${port}:5432`,
     'postgres:16-alpine',
   ])
   if (start.code !== 0) {

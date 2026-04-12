@@ -25,7 +25,8 @@ const TEMPLATES = [
     category: 'sales',
     icon: 'users',
     agentTeamJson: ['researcher', 'data-analyst', 'copywriter'],
-    defaultPrompt: 'Find {{count}} qualified prospects matching this ICP: {{icp}}. Enrich with name, company, role, reason-to-reach-out, and a personalized first line.',
+    defaultPrompt:
+      'Find {{count}} qualified prospects matching this ICP: {{icp}}. Enrich with name, company, role, reason-to-reach-out, and a personalized first line.',
     paramsSchema: {
       icp: { type: 'string', label: 'Ideal Customer Profile', required: true },
       count: { type: 'string', label: 'Number of prospects (default: 25)', required: false },
@@ -38,7 +39,8 @@ const TEMPLATES = [
     category: 'operations',
     icon: 'file-text',
     agentTeamJson: ['copywriter', 'analyst', 'editor'],
-    defaultPrompt: 'Write a proposal for client {{client}}. Scope: {{scope}}. Include deliverables, timeline, and pricing sections.',
+    defaultPrompt:
+      'Write a proposal for client {{client}}. Scope: {{scope}}. Include deliverables, timeline, and pricing sections.',
     paramsSchema: {
       client: { type: 'string', label: 'Client name', required: true },
       scope: { type: 'string', label: 'Scope / project notes', required: true },
@@ -51,7 +53,8 @@ const TEMPLATES = [
     category: 'research',
     icon: 'search',
     agentTeamJson: ['researcher', 'analyst', 'editor'],
-    defaultPrompt: 'Research the market around {{topic}}. Identify top 5 competitors, their positioning, pricing, strengths, and gaps. Recommend positioning for us.',
+    defaultPrompt:
+      'Research the market around {{topic}}. Identify top 5 competitors, their positioning, pricing, strengths, and gaps. Recommend positioning for us.',
     paramsSchema: {
       topic: { type: 'string', label: 'Company or topic to research', required: true },
     },
@@ -63,7 +66,8 @@ const TEMPLATES = [
     category: 'marketing',
     icon: 'repeat',
     agentTeamJson: ['copywriter', 'social-media', 'editor'],
-    defaultPrompt: 'Repurpose this content into: 1) Twitter thread, 2) LinkedIn post, 3) Newsletter section, 4) Shortform video script.\n\nContent:\n{{content}}',
+    defaultPrompt:
+      'Repurpose this content into: 1) Twitter thread, 2) LinkedIn post, 3) Newsletter section, 4) Shortform video script.\n\nContent:\n{{content}}',
     paramsSchema: {
       content: { type: 'string', label: 'Paste your long-form content', required: true },
     },
@@ -75,7 +79,8 @@ const TEMPLATES = [
     category: 'operations',
     icon: 'mail',
     agentTeamJson: ['analyst', 'copywriter'],
-    defaultPrompt: 'Triage these emails. For each: categorize (urgent/important/low/spam), summarize in one line, and draft a reply.\n\nEmails:\n{{emails}}',
+    defaultPrompt:
+      'Triage these emails. For each: categorize (urgent/important/low/spam), summarize in one line, and draft a reply.\n\nEmails:\n{{emails}}',
     paramsSchema: {
       emails: { type: 'string', label: 'Paste your emails', required: true },
     },
@@ -87,7 +92,8 @@ const TEMPLATES = [
     category: 'operations',
     icon: 'calendar',
     agentTeamJson: ['researcher', 'analyst', 'copywriter'],
-    defaultPrompt: 'Prepare a meeting brief for: {{meeting}}. Attendees: {{attendees}}. Context: {{context}}. Include attendee backgrounds, talking points, questions to ask, and likely objections.',
+    defaultPrompt:
+      'Prepare a meeting brief for: {{meeting}}. Attendees: {{attendees}}. Context: {{context}}. Include attendee backgrounds, talking points, questions to ask, and likely objections.',
     paramsSchema: {
       meeting: { type: 'string', label: 'Meeting topic', required: true },
       attendees: { type: 'string', label: 'Attendee names + roles', required: true },
@@ -101,7 +107,8 @@ const TEMPLATES = [
     category: 'operations',
     icon: 'trending-up',
     agentTeamJson: ['copywriter', 'editor'],
-    defaultPrompt: 'Write a weekly investor/stakeholder update. Metrics: {{metrics}}. Wins: {{wins}}. Blockers: {{blockers}}. Tone: concise, confident, honest.',
+    defaultPrompt:
+      'Write a weekly investor/stakeholder update. Metrics: {{metrics}}. Wins: {{wins}}. Blockers: {{blockers}}. Tone: concise, confident, honest.',
     paramsSchema: {
       metrics: { type: 'string', label: 'Key metrics this week', required: true },
       wins: { type: 'string', label: 'Wins / progress', required: true },
@@ -115,7 +122,8 @@ const TEMPLATES = [
     category: 'marketing',
     icon: 'layout',
     agentTeamJson: ['copywriter', 'seo', 'editor'],
-    defaultPrompt: 'Write landing page copy for: {{product}}. Include: hero headline + subtext, 4-6 feature blocks, FAQ (5 questions), and 2 CTA variations.',
+    defaultPrompt:
+      'Write landing page copy for: {{product}}. Include: hero headline + subtext, 4-6 feature blocks, FAQ (5 questions), and 2 CTA variations.',
     paramsSchema: {
       product: { type: 'string', label: 'Product one-liner', required: true },
     },
@@ -127,7 +135,8 @@ const TEMPLATES = [
     category: 'operations',
     icon: 'user-plus',
     agentTeamJson: ['copywriter', 'analyst', 'editor'],
-    defaultPrompt: 'Create a hiring pipeline for: {{role}}. Produce: 1) Job description, 2) Interview rubric (4 rounds), 3) Scorecard template, 4) Boolean sourcing strings for LinkedIn.',
+    defaultPrompt:
+      'Create a hiring pipeline for: {{role}}. Produce: 1) Job description, 2) Interview rubric (4 rounds), 3) Scorecard template, 4) Boolean sourcing strings for LinkedIn.',
     paramsSchema: {
       role: { type: 'string', label: 'Role description', required: true },
     },

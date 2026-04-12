@@ -57,8 +57,5 @@ export async function GET() {
   const [db, sshToDocker] = await Promise.all([checkDb(), checkSshToDocker()])
   const diskFree = checkDiskFree()
   const ok = db && sshToDocker && diskFree
-  return NextResponse.json(
-    { ok, db, sshToDocker, diskFree },
-    { status: ok ? 200 : 503 },
-  )
+  return NextResponse.json({ ok, db, sshToDocker, diskFree }, { status: ok ? 200 : 503 })
 }
