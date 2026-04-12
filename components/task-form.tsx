@@ -20,6 +20,7 @@ import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw, Pi } from '
 import { setInstallDependencies, setMaxDuration, setKeepAlive, setEnableBrowser } from '@/lib/utils/cookies'
 import { useConnectors } from '@/components/connectors-provider'
 import { ConnectorDialog } from '@/components/connectors/manage-connectors'
+import { TemplateStrip } from '@/components/template-strip'
 import { toast } from 'sonner'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { taskPromptAtom } from '@/lib/atoms/task'
@@ -443,6 +444,19 @@ export function TaskForm({
           </a>
         </p>
       </div>
+
+      <TemplateStrip
+        onSelect={async (slug) => {
+          const res = await fetch(`/api/templates/${slug}`)
+          const data = await res.json()
+          if (data?.template?.defaultPrompt) {
+            setPrompt(data.template.defaultPrompt)
+            if (textareaRef.current) {
+              textareaRef.current.focus()
+            }
+          }
+        }}
+      />
 
       <form onSubmit={handleSubmit}>
         <div className="relative border rounded-2xl shadow-sm overflow-hidden bg-muted/30 cursor-text">

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, createContext, useContext, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { TaskSidebar } from '@/components/task-sidebar'
 import { Task } from '@/lib/db/schema'
 import { Button } from '@/components/ui/button'
@@ -164,6 +165,24 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
     return () => clearInterval(interval)
   }, [])
 
+  // BYO-key gate: redirect to onboarding if no Anthropic key configured
+  const router = useRouter()
+  useEffect(() => {
+    const checkApiKey = async () => {
+      try {
+        const res = await fetch('/api/api-keys/check?agent=claude')
+        if (!res.ok) return // not authenticated or other error — skip
+        const data = await res.json()
+        if (data.hasKey === false) {
+          router.push('/onboarding/key')
+        }
+      } catch {
+        // Network error — skip redirect
+      }
+    }
+    checkApiKey()
+  }, [])
+
   const toggleSidebar = useCallback(() => {
     updateSidebarOpen(!isSidebarOpen)
   }, [isSidebarOpen, updateSidebarOpen])
@@ -244,6 +263,7 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
       sandboxUrl: null,
       previewUrl: null,
       mcpServerIds: null,
+      templateSlug: null,
       prUrl: null,
       prNumber: null,
       prStatus: null,
