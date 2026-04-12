@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Geist, Geist_Mono } from 'next/font/google'
+import { Geist, Geist_Mono, Outfit } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
 import { ThemeProvider } from '@/components/theme-provider'
@@ -19,10 +19,16 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 })
 
+const outfit = Outfit({
+  variable: '--font-outfit',
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+})
+
 export const metadata: Metadata = {
-  title: 'Cowork-Claw | AI Coding Agent Platform',
+  title: 'Cowork-Claw | Your AI Cowork Team',
   description:
-    'Orchestrate a team of AI coding agents — Claude, Codex, Copilot, Cursor, Gemini and more — to build, fix, and ship code from your browser.',
+    'Stop doing office work. Your AI team does it together — pitch decks, proposals, research, outreach, and more.',
 }
 
 export default function RootLayout({
@@ -32,7 +38,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${geistSans.variable} ${geistMono.variable} ${outfit.variable} antialiased`}>
         <JotaiProvider>
           <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
             <SessionProvider />
