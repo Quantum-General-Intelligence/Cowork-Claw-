@@ -3,7 +3,7 @@ import { db } from '@/lib/db/client'
 import { tasks, insertTaskSchema } from '@/lib/db/schema'
 import { generateId } from '@/lib/utils/id'
 import { processTaskWithTimeout } from '@/lib/tasks/executor'
-import { eq, desc, or, and, isNull } from 'drizzle-orm'
+import { eq, desc, or, and, isNull, sql } from 'drizzle-orm'
 import { createTaskLogger } from '@/lib/utils/task-logger'
 import { generateBranchName, createFallbackBranchName } from '@/lib/utils/branch-name-generator'
 import { generateTaskTitle, createFallbackTitle } from '@/lib/utils/title-generator'
@@ -12,6 +12,7 @@ import { getUserGitHubToken } from '@/lib/github/user-token'
 import { getGitHubUser } from '@/lib/github/client'
 import { getUserApiKeys } from '@/lib/api-keys/user-keys'
 import { checkRateLimit } from '@/lib/utils/rate-limit'
+import { getUserPlan } from '@/lib/billing/check-subscription'
 import { getMaxSandboxDuration } from '@/lib/db/settings'
 
 export async function GET() {
@@ -51,6 +52,42 @@ export async function POST(request: NextRequest) {
           total: rateLimit.total,
           resetAt: rateLimit.resetAt.toISOString(),
         },
+        { status: 429 },
+      )
+    }
+
+    // Check per-tier concurrency limit
+    const userId = session.user.id
+    const userPlan = await getUserPlan(userId)
+    const runningTasks = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(tasks)
+      .where(and(eq(tasks.userId, userId), eq(tasks.status, 'processing')))
+    const runningCount = runningTasks[0]?.count ?? 0
+
+    if (runningCount >= userPlan.maxConcurrent) {
+      return NextResponse.json(
+        { error: 'You have reached your concurrent task limit. Wait for a task to finish or upgrade your plan.' },
+        { status: 429 },
+      )
+    }
+
+    // Check daily task limit
+    const today = new Date().toISOString().slice(0, 10)
+    const todayTasks = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(tasks)
+      .where(
+        and(
+          eq(tasks.userId, userId),
+          sql`DATE(${tasks.createdAt}) = ${today}`
+        )
+      )
+    const todayCount = todayTasks[0]?.count ?? 0
+
+    if (todayCount >= userPlan.dailyApiCalls) {
+      return NextResponse.json(
+        { error: 'You have reached your daily task limit. Try again tomorrow or upgrade your plan.' },
         { status: 429 },
       )
     }

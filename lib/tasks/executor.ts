@@ -1,5 +1,6 @@
 import { db } from '@/lib/db/client'
 import { tasks, connectors, taskMessages } from '@/lib/db/schema'
+import { registerArtifacts } from './register-artifacts'
 import { emitActivity } from '@/lib/activity/emit'
 import { generateId } from '@/lib/utils/id'
 import { createSandbox } from '@/lib/sandbox/creation'
@@ -388,6 +389,21 @@ async function processTask(
       } else {
         await logger.updateStatus('completed')
         await logger.updateProgress(100, 'Task completed successfully')
+
+        // Register deliverable artifacts from /out/
+        if (sandbox) {
+          try {
+            const [taskRow] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1)
+            if (taskRow) {
+              const artifactCount = await registerArtifacts(sandbox, taskId, taskRow.userId)
+              if (artifactCount > 0) {
+                await logger.info('Deliverables registered')
+              }
+            }
+          } catch {
+            // Non-fatal
+          }
+        }
 
         // Emit activity event
         const [completedTask] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1)
