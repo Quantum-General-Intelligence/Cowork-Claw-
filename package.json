@@ -15,7 +15,8 @@
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "prepare": "husky",
-    "smoke:p1": "tsx scripts/smoke/00-sandbox-errors.ts && tsx scripts/smoke/01-docker-provider-contract.ts && tsx scripts/smoke/02-factory-parity.ts"
+    "smoke:p1": "tsx scripts/smoke/00-sandbox-errors.ts && tsx scripts/smoke/01-docker-provider-contract.ts && tsx scripts/smoke/02-factory-parity.ts",
+    "smoke:p2": "tsx scripts/smoke/05-env-reader.ts && tsx scripts/smoke/04-db-migrate.ts"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^3.0.64",
