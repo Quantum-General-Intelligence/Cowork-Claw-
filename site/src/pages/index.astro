@@ -4,43 +4,38 @@ import PricingCards from '../components/PricingCards'
 
 const APP_URL = 'https://app.cowork-claw.ai'
 
-const AGENTS = ['Claude', 'Codex', 'Copilot', 'Cursor', 'Gemini', 'OpenCode', 'Pi']
+const AGENTS = ['Researcher', 'Copywriter', 'Analyst', 'Designer', 'Editor', 'SEO', 'Data']
 
 const FEATURES = [
   {
-    title: 'Multi-Agent Orchestration',
-    description: 'Claude, Codex, Copilot, Cursor, Gemini, and more — coordinated to tackle your task.',
-    icon: '🤖',
+    title: 'AI Team, Not a Chatbot',
+    description: 'Multiple agents collaborate on your task — researcher, copywriter, analyst, editor — each doing what they do best.',
+    icon: '🤝',
   },
   {
-    title: 'GitHub Integration',
-    description: 'Connect your repos, create branches, and manage code changes directly from the platform.',
-    icon: '🔀',
+    title: '10 Ready-Made Templates',
+    description: 'Pitch decks, prospecting pipelines, proposals, research briefs, content repurposing, and more — one click to start.',
+    icon: '📋',
   },
   {
-    title: 'Live Sandboxes',
-    description: 'Each task runs in an isolated Docker sandbox with a full development environment.',
+    title: 'Real Deliverables',
+    description: 'Download actual files — slide decks, CSV exports, branded proposals, formatted updates. Not just chat responses.',
     icon: '📦',
   },
   {
-    title: 'Automated PRs',
-    description: 'Agents push code, open pull requests, and respond to review comments automatically.',
-    icon: '🔄',
-  },
-  {
     title: 'Bring Your Own Key',
-    description: 'Use your own API keys for AI providers, or use ours — both included in every plan.',
+    description: 'Use your Anthropic API key. Your key, your usage, your control. Encrypted and never logged.',
     icon: '🔑',
   },
   {
-    title: 'Browser-Based IDE',
-    description: 'File editor, terminal, diff viewer, and LSP — all in your browser, no local setup.',
-    icon: '🌐',
+    title: 'Self-Hosted & Private',
+    description: 'Runs on your VPS in Docker. Your data never leaves your infrastructure.',
+    icon: '🏠',
   },
   {
-    title: 'Secure by Default',
-    description: 'Encrypted credentials, isolated sandboxes, and scoped API keys for every session.',
-    icon: '🛡️',
+    title: 'Built for Founders',
+    description: 'Stop doing office work yourself. Let your AI team handle the repetitive stuff while you focus on what matters.',
+    icon: '🚀',
   },
 ]
 ---
@@ -50,12 +45,11 @@ const FEATURES = [
   <section class="py-20 sm:py-32 px-4 sm:px-6">
     <div class="max-w-3xl mx-auto text-center">
       <h1 class="text-4xl sm:text-6xl font-bold tracking-tight leading-tight">
-        Ship code with a team<br />
-        <span class="text-primary">of AI agents</span>
+        Stop doing office work.<br />
+        <span class="text-primary">Your AI team does it together.</span>
       </h1>
       <p class="mt-6 text-lg sm:text-xl text-muted-foreground max-w-xl mx-auto leading-relaxed">
-        Describe what you want to build. Cowork-Claw orchestrates Claude, Codex, Copilot,
-        Cursor, Gemini and more to get it done — sandboxed, with PRs and full git history.
+        Pitch decks, proposals, research, outreach, hiring — describe what you need, and a team of AI agents works together to deliver it. Cowork meets OpenClaw — for founders.
       </p>
       <p class="mt-3 text-sm text-muted-foreground">
         All plans include hosted sandbox execution and bring-your-own-key support.
@@ -81,7 +75,7 @@ const FEATURES = [
   <!-- Agent strip -->
   <section class="py-10 border-y border-border bg-muted/30">
     <div class="max-w-4xl mx-auto px-4 sm:px-6 text-center">
-      <p class="text-xs uppercase tracking-widest text-muted-foreground mb-4">Powered by</p>
+      <p class="text-xs uppercase tracking-widest text-muted-foreground mb-4">Your AI team includes</p>
       <div class="flex flex-wrap items-center justify-center gap-4 sm:gap-8">
         {AGENTS.map((name) => (
           <span class="text-sm font-medium text-muted-foreground">{name}</span>
