@@ -64,7 +64,7 @@ export function validateEnvironmentVariables(
   }
 
   // Check for sandbox provider configuration
-  const sandboxProvider = process.env.SANDBOX_PROVIDER || (process.env.SANDBOX_SSH_HOST ? 'docker' : 'vercel')
+  const sandboxProvider = process.env.SANDBOX_PROVIDER || 'docker'
 
   if (sandboxProvider === 'docker') {
     if (!process.env.SANDBOX_SSH_HOST) {
@@ -72,16 +72,6 @@ export function validateEnvironmentVariables(
     }
     if (!process.env.SANDBOX_SSH_KEY) {
       errors.push('SANDBOX_SSH_KEY is required for Docker sandbox provider')
-    }
-  } else {
-    if (!process.env.SANDBOX_VERCEL_TEAM_ID) {
-      errors.push('SANDBOX_VERCEL_TEAM_ID is required for sandbox creation')
-    }
-    if (!process.env.SANDBOX_VERCEL_PROJECT_ID) {
-      errors.push('SANDBOX_VERCEL_PROJECT_ID is required for sandbox creation')
-    }
-    if (!process.env.SANDBOX_VERCEL_TOKEN) {
-      errors.push('SANDBOX_VERCEL_TOKEN is required for sandbox creation')
     }
   }
 

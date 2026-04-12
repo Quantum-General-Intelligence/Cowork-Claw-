@@ -178,10 +178,7 @@ export class DockerSandboxProvider implements SandboxProvider {
 
     // Image: prefer explicit config.image (office-cowork task), else fall back to node:<runtime>
     const image =
-      config.image ??
-      (config.runtime === 'node22'
-        ? 'node:22'
-        : `node:${config.runtime?.replace('node', '') || '22'}`)
+      config.image ?? (config.runtime === 'node22' ? 'node:22' : `node:${config.runtime?.replace('node', '') || '22'}`)
 
     const ports = config.ports || [3000]
     const vcpus = config.resources?.vcpus ?? 2
@@ -199,9 +196,7 @@ export class DockerSandboxProvider implements SandboxProvider {
       : ''
 
     // Artifact volume — host path is assumed to exist and be writable by the SSH user.
-    const volumeFlag = config.artifactVolume
-      ? `-v '${config.artifactVolume.replace(/'/g, "'\\''")}:/out'`
-      : ''
+    const volumeFlag = config.artifactVolume ? `-v '${config.artifactVolume.replace(/'/g, "'\\''")}:/out'` : ''
 
     // Base create command. For the node:* fallback we keep the apt-get bootstrap;
     // for cowork-claw/runner:latest the entrypoint already has everything.
@@ -244,9 +239,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     // Readiness probe — only for the node:* bootstrap path. Runner image is ready immediately.
     if (bootstrap) {
       for (let i = 0; i < 30; i++) {
-        const check = await sshExec(`docker exec ${containerName} which git 2>/dev/null`, 15000).catch(
-          () => null,
-        )
+        const check = await sshExec(`docker exec ${containerName} which git 2>/dev/null`, 15000).catch(() => null)
         if (check && check.exitCode === 0) break
         await new Promise((resolve) => setTimeout(resolve, 2000))
       }
