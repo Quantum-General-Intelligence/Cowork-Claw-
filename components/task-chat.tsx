@@ -87,6 +87,9 @@ export function TaskChat({ taskId, task }: TaskChatProps) {
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
   const [overflowingMessages, setOverflowingMessages] = useState<Set<string>>(new Set())
   const contentRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const [artifacts, setArtifacts] = useState<
+    Array<{ id: string; filename: string; mime: string; size: number; downloadUrl: string }>
+  >([])
 
   // Track if each tab has been loaded to avoid refetching on tab switch
   const commentsLoadedRef = useRef(false)
@@ -438,6 +441,16 @@ export function TaskChat({ taskId, task }: TaskChatProps) {
       return () => clearInterval(interval)
     }
   }, [task.status])
+
+  // Fetch artifacts when task is completed
+  useEffect(() => {
+    if (task.status === 'completed') {
+      fetch(`/api/tasks/${task.id}/artifacts`)
+        .then((r) => r.json())
+        .then((data) => setArtifacts(data.artifacts || []))
+        .catch(() => {})
+    }
+  }, [task.status, task.id])
 
   const formatDuration = (messageCreatedAt: Date) => {
     const startTime = new Date(messageCreatedAt).getTime()
@@ -1219,6 +1232,26 @@ export function TaskChat({ taskId, task }: TaskChatProps) {
             }
             return null
           })()}
+
+        {/* Artifacts / Deliverables */}
+        {task.status === 'completed' && artifacts.length > 0 && (
+          <div className="mt-4 space-y-2 px-2">
+            <p className="text-xs font-medium text-muted-foreground">Deliverables</p>
+            {artifacts.map((a) => (
+              <a
+                key={a.id}
+                href={a.downloadUrl}
+                download={a.filename}
+                className="flex items-center gap-2 text-xs px-3 py-2 rounded-md border hover:bg-accent transition-colors"
+              >
+                <span className="flex-1 truncate">{a.filename}</span>
+                <span className="text-muted-foreground flex-shrink-0">
+                  {(a.size != null ? a.size / 1024 : 0).toFixed(1)} KB
+                </span>
+              </a>
+            ))}
+          </div>
+        )}
 
         <div ref={messagesEndRef} />
       </div>
