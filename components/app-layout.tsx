@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, createContext, useContext, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { TaskSidebar } from '@/components/task-sidebar'
 import { Task } from '@/lib/db/schema'
 import { Button } from '@/components/ui/button'
@@ -108,7 +108,7 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
     if (initialIsMobile) return false
     return initialSidebarOpen ?? true
   })
-  const [sidebarWidth, setSidebarWidthState] = useState(initialSidebarWidth || getSidebarWidth())
+  const [sidebarWidth, setSidebarWidthState] = useState(initialSidebarWidth || 288)
   const [isResizing, setIsResizing] = useState(false)
   const [isDesktop, setIsDesktop] = useState(!initialIsMobile)
   const [hasMounted, setHasMounted] = useState(false)
@@ -147,9 +147,16 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
       }
     }
 
+    // Reconcile sidebar width with cookie value now that we're on the client
+    const cookieWidth = getSidebarWidth()
+    if (!initialSidebarWidth && cookieWidth !== sidebarWidth) {
+      setSidebarWidthState(cookieWidth)
+    }
+
     // Mark as mounted to enable transitions
     setHasMounted(true)
-  }, [isDesktop, initialIsMobile, initialSidebarOpen])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Fetch tasks on component mount
   useEffect(() => {
@@ -167,7 +174,11 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
 
   // BYO-key gate: redirect to onboarding if no Anthropic key configured
   const router = useRouter()
+  const pathname = usePathname()
   useEffect(() => {
+    // Skip the key check on auth and onboarding pages to avoid redirect loops
+    if (pathname?.startsWith('/auth') || pathname?.startsWith('/onboarding')) return
+
     const checkApiKey = async () => {
       try {
         const res = await fetch('/api/api-keys/check?agent=claude')
@@ -181,7 +192,7 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
       }
     }
     checkApiKey()
-  }, [])
+  }, [pathname, router])
 
   const toggleSidebar = useCallback(() => {
     updateSidebarOpen(!isSidebarOpen)
