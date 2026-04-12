@@ -30,6 +30,7 @@ export function LogsPane({ task, onHeightChange }: LogsPaneProps) {
   const [activeTab, setActiveTab] = useState<TabType>('logs')
   const [isClearingLogs, setIsClearingLogs] = useState(false)
   const [logFilter, setLogFilter] = useState<LogFilterType>('all')
+  const [progressLog, setProgressLog] = useState<string>('')
   const logsContainerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<TerminalRef>(null)
   const prevLogsLengthRef = useRef<number>(0)
@@ -53,6 +54,43 @@ export function LogsPane({ task, onHeightChange }: LogsPaneProps) {
     window.addEventListener('resize', checkDesktop)
     return () => window.removeEventListener('resize', checkDesktop)
   }, [])
+
+  // SSE live progress streaming when task is processing
+  useEffect(() => {
+    if (task?.status !== 'processing' || !task?.id) {
+      setProgressLog('')
+      return
+    }
+
+    const es = new EventSource(`/api/tasks/${task.id}/stream`)
+
+    es.addEventListener('progress', (e) => {
+      const newLines = JSON.parse(e.data) as string
+      setProgressLog((prev) => prev + newLines)
+      // Auto-scroll if user was at bottom
+      if (logsContainerRef.current && wasAtBottomRef.current) {
+        setTimeout(() => {
+          if (logsContainerRef.current) {
+            logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight
+          }
+        }, 0)
+      }
+    })
+
+    es.addEventListener('status', () => {
+      refreshTasks()
+    })
+
+    es.addEventListener('done', () => {
+      es.close()
+    })
+
+    es.onerror = () => {
+      es.close()
+    }
+
+    return () => es.close()
+  }, [task?.status, task?.id, refreshTasks])
 
   // Initialize height and collapsed state from cookies on mount
   useEffect(() => {
@@ -394,6 +432,12 @@ export function LogsPane({ task, onHeightChange }: LogsPaneProps) {
               </div>
             )
           })}
+          {progressLog && (
+            <div className="mt-1 border-t border-white/10 pt-1">
+              <div className="text-yellow-400/60 text-[10px] mb-0.5">— live progress —</div>
+              <pre className="text-yellow-300 text-xs whitespace-pre-wrap break-all font-mono leading-tight">{progressLog}</pre>
+            </div>
+          )}
         </div>
         <div className={cn('flex-1 overflow-hidden', (isCollapsed || activeTab !== 'terminal') && 'hidden')}>
           <Terminal
