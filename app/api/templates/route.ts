@@ -14,6 +14,7 @@ export async function GET() {
         category: workflowTemplates.category,
         icon: workflowTemplates.icon,
         paramsSchema: workflowTemplates.paramsSchema,
+        defaultAgent: workflowTemplates.defaultAgent,
       })
       .from(workflowTemplates)
       .orderBy(workflowTemplates.name)

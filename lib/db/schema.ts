@@ -662,6 +662,7 @@ export const workflowTemplates = pgTable('workflow_templates', {
   agentTeamJson: jsonb('agent_team_json').$type<unknown[]>().default([]),
   defaultPrompt: text('default_prompt').notNull(),
   paramsSchema: jsonb('params_schema').$type<Record<string, unknown>>().default({}),
+  defaultAgent: text('default_agent').default('claude'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 })

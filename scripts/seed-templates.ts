@@ -380,7 +380,7 @@ export async function seedTemplates(): Promise<void> {
 
     for (const t of TEMPLATES) {
       await sql`
-        INSERT INTO workflow_templates (id, slug, name, description, category, icon, agent_team_json, default_prompt, params_schema)
+        INSERT INTO workflow_templates (id, slug, name, description, category, icon, agent_team_json, default_prompt, params_schema, default_agent)
         VALUES (
           ${nanoid()},
           ${t.slug},
@@ -390,7 +390,8 @@ export async function seedTemplates(): Promise<void> {
           ${t.icon},
           ${JSON.stringify(t.agentTeamJson)}::jsonb,
           ${t.defaultPrompt},
-          ${JSON.stringify(t.paramsSchema)}::jsonb
+          ${JSON.stringify(t.paramsSchema)}::jsonb,
+          ${t.category === 'internal' ? 'gemini' : 'claude'}
         )
         ON CONFLICT (slug) DO UPDATE SET
           name = EXCLUDED.name,
@@ -400,6 +401,7 @@ export async function seedTemplates(): Promise<void> {
           agent_team_json = EXCLUDED.agent_team_json,
           default_prompt = EXCLUDED.default_prompt,
           params_schema = EXCLUDED.params_schema,
+          default_agent = EXCLUDED.default_agent,
           updated_at = now()
       `
     }
