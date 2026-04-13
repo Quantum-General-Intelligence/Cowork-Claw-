@@ -11,6 +11,15 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# NEXT_PUBLIC_ vars must be present at build time for Next.js to inline them
+# into the client bundle. Docker Compose passes these via build.args.
+ARG NEXT_PUBLIC_SUPABASE_URL
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
+ARG NEXT_PUBLIC_SUPABASE_PUBLISHABLE_DEFAULT_KEY
+ARG NEXT_PUBLIC_AUTH_PROVIDERS
+ARG NEXT_PUBLIC_GITHUB_CLIENT_ID
+
 RUN pnpm build
 
 # Runner stage — slim, production-only.
