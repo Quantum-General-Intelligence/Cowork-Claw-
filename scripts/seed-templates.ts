@@ -511,6 +511,261 @@ const TEMPLATES = [
       okrs: { type: 'string', label: 'OKRs with scores and commentary (paste raw or structured)', required: true },
     },
   },
+
+  // ── Trelexa Hub — Presentations & Docs ───────────────────────────────────
+  {
+    slug: 'trelexa-pitch-deck-brand',
+    name: '[Trelexa] Branded Pitch Deck',
+    description: 'Create a 12-slide branded pitch deck outline with speaker notes for any portfolio brand.',
+    category: 'trelexa',
+    icon: 'presentation',
+    agentTeamJson: ['researcher', 'copywriter', 'designer', 'editor'],
+    defaultPrompt:
+      'Create a branded pitch deck for the {{brand}} brand.\n\nBrand: {{brand}}\nAudience: {{audience}} (investors / clients / partners)\nKey metrics: {{key_metrics}}\nAsk or offer: {{ask_offer}}\n\nOutput a 12-slide outline with speaker notes for each slide:\n1. Title slide — brand name, tagline, presenter name, date\n2. Problem — the pain point the brand solves, backed by a data point\n3. Solution — what the brand offers, one-liner + 3 bullet elaborations\n4. Market size — TAM / SAM / SOM with sources\n5. Product demo screenshots — describe 2–3 key UI/product moments with visual directions\n6. Traction & metrics — {{key_metrics}} formatted as achievement callouts\n7. Team — key roles, credentials, why this team\n8. Business model — revenue streams, pricing tiers, unit economics\n9. Competitive landscape — 2x2 matrix (axes: price vs capability) with 4–6 competitors placed\n10. Roadmap — 3–4 milestones over 12 months, visual timeline format\n11. Financials — 3-year revenue projection table (conservative / base / optimistic)\n12. CTA — the ask ({{ask_offer}}), what happens next, contact info\n\nFor each slide: [Slide X — Title] → headline copy, 3–5 bullet points or layout notes, speaker notes (2–4 sentences).\n\nTone: authoritative, data-driven, concise. Tailor language to {{audience}}.',
+    paramsSchema: {
+      brand: { type: 'string', label: 'Brand (qalitex / theosym / trelexa / care-europe / nourify / sam-sammane)', required: true },
+      audience: { type: 'string', label: 'Audience (investors / clients / partners)', required: true },
+      key_metrics: { type: 'string', label: 'Key metrics to highlight (e.g. MRR, users, growth rate)', required: true },
+      ask_offer: { type: 'string', label: 'Ask or offer (e.g. raising €500k, proposing a retainer)', required: true },
+    },
+  },
+  {
+    slug: 'trelexa-business-plan',
+    name: '[Trelexa] Business Plan Generator',
+    description: 'Generate a full business plan document for a brand or new venture with 3-year financial projections.',
+    category: 'trelexa',
+    icon: 'file-text',
+    agentTeamJson: ['researcher', 'analyst', 'copywriter', 'editor'],
+    defaultPrompt:
+      'Generate a business plan document for the following brand or venture.\n\nBrand / venture name: {{brand_name}}\nIndustry: {{industry}}\nTarget market: {{target_market}}\nRevenue model: {{revenue_model}}\nCurrent stage: {{current_stage}} (idea / pre-revenue / early revenue / scaling)\n\nDeliver a structured business plan with the following sections:\n\n1. Executive Summary (300 words max) — vision, mission, what the business does, target market, current traction, funding ask if applicable\n2. Market Analysis — market size (TAM/SAM/SOM), key trends, regulatory environment, customer segments\n3. Competitive Landscape — top 5 competitors, positioning matrix, our differentiation\n4. Product / Service Description — what we sell, how it works, key features, IP or proprietary elements\n5. Go-to-Market Strategy — channels (organic, paid, partnerships, direct), launch sequence, pricing strategy\n6. Financial Projections (3-Year) — revenue table (Year 1 / Year 2 / Year 3) with assumptions, cost structure, break-even estimate, burn rate if pre-revenue\n7. Team Requirements — key hires needed, roles, ideal profiles\n8. Funding Needs — amount, use of funds breakdown (table), expected milestones unlocked\n\nFormat each section with a header and structured body. Use tables for financials and competitive matrix. Tone: professional, investor-ready.',
+    paramsSchema: {
+      brand_name: { type: 'string', label: 'Brand or venture name', required: true },
+      industry: { type: 'string', label: 'Industry (e.g. biotech, SaaS, CPG supplements)', required: true },
+      target_market: { type: 'string', label: 'Target market description', required: true },
+      revenue_model: { type: 'string', label: 'Revenue model (e.g. SaaS subscription, B2B services, DTC ecommerce)', required: true },
+      current_stage: { type: 'string', label: 'Current stage (idea / pre-revenue / early revenue / scaling)', required: true },
+    },
+  },
+  {
+    slug: 'trelexa-case-study',
+    name: '[Trelexa] Client Case Study',
+    description: 'Write a formatted client success story / case study with results, testimonial placeholder, and CTA.',
+    category: 'trelexa',
+    icon: 'award',
+    agentTeamJson: ['copywriter', 'editor'],
+    defaultPrompt:
+      'Write a client case study for a Trelexa Hub brand.\n\nClient name: {{client_name}}\nIndustry: {{industry}}\nChallenge: {{challenge}}\nSolution provided: {{solution}}\nResults (metrics): {{results}}\n\nDeliver a fully formatted case study:\n\n1. Headline — outcome-first, includes client name and a specific metric (e.g. "How [Client] Reduced Recall Risk by 40% with Qalitex")\n2. Executive Summary (80 words max) — problem → solution → result in 3 sentences\n3. The Challenge — 2 paragraphs describing the client\'s situation before engagement, the specific pain points, and what was at stake\n4. The Solution — 2 paragraphs describing what was implemented, why it was the right approach, key steps or phases\n5. The Results — bullet list of 4–6 specific outcomes with numbers from {{results}}; include a before/after comparison where possible\n6. Testimonial Placeholder — [QUOTE: {client_name} testimonial about the outcome and experience — request from client]\n7. CTA — 2-sentence closing with link placeholder [CTA LINK] encouraging similar companies to get in touch\n\nTone: authoritative, specific, benefit-focused. Third-person throughout. Length: 600–800 words.',
+    paramsSchema: {
+      client_name: { type: 'string', label: 'Client name', required: true },
+      industry: { type: 'string', label: 'Client industry', required: true },
+      challenge: { type: 'string', label: 'Challenge the client faced', required: true },
+      solution: { type: 'string', label: 'Solution provided', required: true },
+      results: { type: 'string', label: 'Results with specific metrics', required: true },
+    },
+  },
+
+  // ── Trelexa Hub — ICP & Client Profiling ──────────────────────────────────
+  {
+    slug: 'trelexa-icp-builder',
+    name: '[Trelexa] ICP Builder',
+    description: 'Build a detailed Ideal Customer Profile for a brand\'s service with outreach channel recommendations.',
+    category: 'trelexa',
+    icon: 'users',
+    agentTeamJson: ['researcher', 'analyst', 'copywriter'],
+    defaultPrompt:
+      'Build an Ideal Customer Profile (ICP) for the following brand and service.\n\nBrand: {{brand}}\nService offered: {{service}}\nCurrent best clients (optional): {{best_clients}}\n\nDeliver a comprehensive ICP document with the following sections:\n\n1. Demographic Profile — age range, gender split, education level, job title patterns, seniority level\n2. Firmographic Profile — industry verticals (primary + secondary), company size (employees), annual revenue range, geography (EU / US / global), company stage (startup / growth / enterprise)\n3. Psychographic Triggers — core motivations for buying, professional ambitions, fears and risks they manage, how they measure success\n4. Buying Signals — specific events that indicate they\'re ready to buy (e.g. funding rounds, regulatory changes, product launches, hiring signals)\n5. Pain Points — top 5 pain points ranked by severity; for each: what it costs them (time, money, reputation)\n6. Objection Map — top 5 objections to buying + recommended responses\n7. Where They Hang Out Online — specific communities (LinkedIn groups, Slack channels, subreddits, newsletters, conferences)\n8. Recommended Outreach Channels — ranked list (LinkedIn cold outreach / Instantly cold email / content SEO / paid / partnerships) with rationale for each\n\nFormat: use headers and bullet points. End with a one-paragraph ICP summary suitable for briefing a sales rep.',
+    paramsSchema: {
+      brand: { type: 'string', label: 'Brand (qalitex / theosym / trelexa / care-europe / nourify / sam-sammane)', required: true },
+      service: { type: 'string', label: 'Service or product offering', required: true },
+      best_clients: { type: 'string', label: 'Current best clients (names or descriptions, optional)', required: false },
+    },
+  },
+  {
+    slug: 'trelexa-client-onboarding-packet',
+    name: '[Trelexa] Client Onboarding Packet',
+    description: 'Generate a complete client onboarding packet: welcome email, timeline, checklist, and 30-day plan.',
+    category: 'trelexa',
+    icon: 'clipboard',
+    agentTeamJson: ['copywriter', 'analyst', 'editor'],
+    defaultPrompt:
+      'Generate a client onboarding packet for a new client.\n\nClient name: {{client_name}}\nService purchased: {{service_purchased}}\nBrand managing the account: {{managing_brand}} (trelexa / qalitex / theosym / care-europe)\n\nDeliver the following onboarding assets:\n\n1. Welcome Email — subject line + body (200 words max); warm, professional; confirms what they bought, what happens next, and who their point of contact is\n2. Timeline & Expectations — week-by-week overview of the first 6 weeks: what we deliver, what we need from the client, key milestones\n3. Deliverables Checklist — complete list of all deliverables for {{service_purchased}}, formatted as a tickbox checklist with estimated delivery dates (relative to start date: Day 1, Week 2, etc.)\n4. Access Requirements — list of accounts/credentials needed from the client (social accounts, CMS access, Google Analytics, ad accounts, brand assets); format as a table with: Item | Why We Need It | Urgency (Day 1 / Week 1 / Week 2)\n5. Communication Cadence — meeting schedule (weekly sync / monthly review / ad-hoc), preferred communication channels, response time SLAs\n6. First 30-Day Plan — specific action items per week (Week 1 / Week 2 / Week 3 / Week 4), owner for each item (us or client), success criteria\n\nTone: professional, organised, confidence-inspiring.',
+    paramsSchema: {
+      client_name: { type: 'string', label: 'Client name', required: true },
+      service_purchased: { type: 'string', label: 'Service purchased (e.g. PR retainer, SEO package, content management)', required: true },
+      managing_brand: { type: 'string', label: 'Brand managing the account (trelexa / qalitex / theosym / care-europe)', required: true },
+    },
+  },
+  {
+    slug: 'trelexa-prospect-research',
+    name: '[Trelexa] Prospect Deep Research',
+    description: 'Deep-research a specific prospect before outreach with personalised conversation starters.',
+    category: 'trelexa',
+    icon: 'search',
+    agentTeamJson: ['researcher', 'analyst', 'copywriter'],
+    defaultPrompt:
+      'Deep-research a specific prospect before outreach.\n\nPerson name: {{person_name}}\nCompany: {{company}}\nRole: {{role}}\nLinkedIn URL (optional): {{linkedin_url}}\n\nResearch and output the following sections:\n\n1. Company Overview — what the company does, size, stage, revenue (estimated), key products/services, recent news (last 90 days)\n2. Recent News & Signals — funding rounds, product launches, partnerships, regulatory events, press mentions; flag the most outreach-relevant signal\n3. Tech Stack — known tools and platforms the company uses (sourced from job listings, G2, BuiltWith data)\n4. Competitors — top 3 competitors with a one-line differentiation note\n5. Prospect Background — {{person_name}}\'s career history summary, tenure at {{company}}, LinkedIn activity themes, areas of public expertise\n6. Mutual Connections — list any known mutual connections or shared affiliations (conferences, groups, publications); if none known, flag "check LinkedIn"\n7. 3 Personalised Conversation Starters — each one references a specific finding from the research above; written as the first sentence of a cold email or LinkedIn message (natural, no fluff, under 25 words each)\n8. Recommended Approach — which outreach channel to use first (cold email via Instantly / LinkedIn via AimFox / content engagement first), reasoning, and suggested timing\n\nFlag confidence level (High / Medium / Low) for each section based on data availability.',
+    paramsSchema: {
+      person_name: { type: 'string', label: 'Prospect full name', required: true },
+      company: { type: 'string', label: 'Company name', required: true },
+      role: { type: 'string', label: 'Prospect\'s role / title', required: true },
+      linkedin_url: { type: 'string', label: 'LinkedIn URL (optional)', required: false },
+    },
+  },
+
+  // ── Trelexa Hub — Visual & Diagrams ──────────────────────────────────────
+  {
+    slug: 'trelexa-svg-diagram',
+    name: '[Trelexa] SVG Diagram Generator',
+    description: 'Generate clean SVG code for flowcharts, architectures, process diagrams, timelines, or comparison charts with Cowork-Claw brand colours.',
+    category: 'trelexa',
+    icon: 'git-branch',
+    agentTeamJson: ['designer', 'copywriter'],
+    defaultPrompt:
+      'Generate a clean SVG diagram.\n\nDiagram type: {{diagram_type}} (flowchart / architecture / process / comparison / timeline)\nTitle: {{title}}\nElements (comma-separated): {{elements}}\nStyle: {{style}} (minimal / corporate / playful)\n\nOutput requirements:\n- Valid, self-contained SVG code ready to paste into an HTML file or open directly in a browser\n- viewBox="0 0 800 600" (adjust height if needed for content)\n- Accent colour: #e26f03 (Cowork-Claw gold) — use for primary nodes, key connectors, or highlighted elements\n- Neutral palette: #1a1a1a (text), #f5f5f5 (background), #d0d0d0 (secondary lines)\n- All text readable at 1x scale (min font-size: 13px)\n- No animations, no JavaScript, no external dependencies\n- Proper text labels on all nodes/elements\n- PNG-ready layout: clean whitespace, no elements cut off\n\nDiagram-type specifics:\n- flowchart: rectangular nodes with rounded corners, diamond decision nodes, directional arrows\n- architecture: layered boxes with component labels, dashed boundary lines for system scopes\n- process: numbered steps in a horizontal or vertical flow, milestone markers\n- comparison: 2-column or 2x2 matrix layout, clear axis labels\n- timeline: horizontal or vertical timeline, date/period markers, event descriptions\n\nAfter the SVG code block, add a brief "Usage notes" section: recommended dimensions for web vs print, any suggested edits to personalise the diagram.',
+    paramsSchema: {
+      diagram_type: { type: 'string', label: 'Diagram type (flowchart / architecture / process / comparison / timeline)', required: true },
+      title: { type: 'string', label: 'Diagram title', required: true },
+      elements: { type: 'string', label: 'Elements / nodes (comma-separated)', required: true },
+      style: { type: 'string', label: 'Style (minimal / corporate / playful)', required: false },
+    },
+  },
+  {
+    slug: 'trelexa-infographic-outline',
+    name: '[Trelexa] Infographic Outline',
+    description: 'Design an infographic structure with data visualisation plan, chart recommendations, and copy per section.',
+    category: 'trelexa',
+    icon: 'bar-chart-2',
+    agentTeamJson: ['designer', 'copywriter', 'analyst'],
+    defaultPrompt:
+      'Design an infographic outline with a data visualisation plan.\n\nTopic: {{topic}}\nKey data points: {{data_points}} (5–8 data points separated by semicolons)\nTarget audience: {{target_audience}}\nBrand: {{brand}}\n\nDeliver the following:\n\n1. Infographic Structure — section-by-section breakdown:\n   - Header: title (max 10 words), subtitle (max 20 words), brand logo placeholder\n   - Data Blocks (one per data point): statistic/fact, supporting sentence (max 15 words), visual recommendation (see below)\n   - CTA Footer: one-sentence CTA + URL placeholder\n2. Chart / Visual Recommendations — for each data point, recommend the most appropriate visualisation type (bar chart, donut chart, icon array, stat callout, comparison table, timeline, map) with a brief rationale\n3. Colour Palette — pull from {{brand}} brand guidelines:\n   - Qalitex: navy #1a2e4a, clinical white #f8f9fa, accent teal #00a8a8\n   - TheoSym: deep purple #2d1b69, electric blue #0066ff, white\n   - Trelexa: charcoal #2c2c2c, gold #c9a84c, white\n   - Care Europe: EU blue #003399, medical green #00a550, white\n   - Nourify: warm green #4caf50, cream #fafaf0, amber #ff8f00\n   - Sam Sammane / generic: Cowork-Claw gold #e26f03, dark #1a1a1a, white\n4. Copy for Each Section — headline + data label text, final copy-edited\n5. Dimensions:\n   - Social (Instagram/LinkedIn): 1080×1920 px\n   - Blog embed: 800×2000 px\n   Note any layout differences between the two sizes.',
+    paramsSchema: {
+      topic: { type: 'string', label: 'Infographic topic', required: true },
+      data_points: { type: 'string', label: 'Key data points (5–8, separated by semicolons)', required: true },
+      target_audience: { type: 'string', label: 'Target audience', required: true },
+      brand: { type: 'string', label: 'Brand (qalitex / theosym / trelexa / care-europe / nourify / sam-sammane)', required: true },
+    },
+  },
+
+  // ── Trelexa Hub — Meetings & Operations ──────────────────────────────────
+  {
+    slug: 'trelexa-meeting-agenda',
+    name: '[Trelexa] Meeting Agenda',
+    description: 'Create a structured timed meeting agenda with objectives, decision items, and action item template.',
+    category: 'trelexa',
+    icon: 'calendar',
+    agentTeamJson: ['copywriter', 'analyst'],
+    defaultPrompt:
+      'Create a structured meeting agenda.\n\nMeeting type: {{meeting_type}} (client kickoff / weekly sync / quarterly review / strategy session)\nAttendees: {{attendees}}\nTopics: {{topics}}\nTotal duration: {{duration}} minutes\n\nDeliver a complete agenda document:\n\n1. Meeting Header — title, date placeholder, time + timezone placeholder, location/link placeholder, facilitator (first name from {{attendees}})\n2. Meeting Objectives — 2–3 clear, outcome-focused objectives (what decisions or outputs should exist by the end)\n3. Timed Agenda — allocate the full {{duration}} minutes across items. Format: | Time | Item | Owner | Type (discuss/decide/update/breakout) |\n   - Always include: Welcome & intros (5 min), Wrap-up & next steps (5 min), any mandatory items for the meeting type\n   - client kickoff: scope alignment, access checklist review, communication norms, quick wins\n   - weekly sync: wins, blockers, priorities, metric review\n   - quarterly review: OKR scoring, lessons, next quarter planning\n   - strategy session: context setting, problem framing, options generation, decision\n4. Decision Items — a pre-populated list of decisions that need to be made in this meeting\n5. Action Items Template — table: | Action | Owner | Due Date | Notes |\n6. Pre-Read List — 2–4 documents or data points attendees should review before the meeting\n\nTone: crisp, professional, time-respectful.',
+    paramsSchema: {
+      meeting_type: { type: 'string', label: 'Meeting type (client kickoff / weekly sync / quarterly review / strategy session)', required: true },
+      attendees: { type: 'string', label: 'Attendees (names + roles)', required: true },
+      topics: { type: 'string', label: 'Topics to cover', required: true },
+      duration: { type: 'string', label: 'Total duration in minutes (e.g. 30, 60, 90)', required: true },
+    },
+  },
+  {
+    slug: 'trelexa-meeting-minutes',
+    name: '[Trelexa] Meeting Minutes',
+    description: 'Convert rough meeting notes into formatted minutes with decisions, action items, and a follow-up email draft.',
+    category: 'trelexa',
+    icon: 'edit-3',
+    agentTeamJson: ['copywriter', 'analyst', 'editor'],
+    defaultPrompt:
+      'Convert rough meeting notes into formatted meeting minutes.\n\nMeeting title: {{meeting_title}}\nDate: {{meeting_date}}\nAttendees: {{attendees}}\nRaw notes: {{raw_notes}}\n\nDeliver the following formatted output:\n\n1. Meeting Minutes Header — title, date, attendees, facilitator, scribe placeholder\n2. Decisions Made — bullet list of all decisions reached during the meeting; each decision: bold statement, one-sentence rationale if noted in the raw notes\n3. Action Items — table: | # | Action Item | Owner | Due Date | Priority (High/Med/Low) |\n   — extract all explicit action items from the raw notes; flag any items where owner or due date is unclear with [TBC]\n4. Key Discussion Points — 4–8 bullet points summarising the main topics discussed (not every detail, just the substance)\n5. Next Meeting — placeholder: [Date TBC], [Agenda preview based on open action items]\n6. Follow-Up Email Draft — a send-ready email the facilitator can send to all attendees:\n   - Subject: "Minutes + Actions — {{meeting_title}} ({{meeting_date}})"\n   - Body: brief recap (3 sentences), decisions bullet list, action items table, next meeting note\n   - Tone: professional, clear, under 250 words\n\nFormat the minutes for easy scanning (headers, tables, bullets). Correct any grammar in the raw notes without changing meaning.',
+    paramsSchema: {
+      meeting_title: { type: 'string', label: 'Meeting title', required: true },
+      meeting_date: { type: 'string', label: 'Meeting date (e.g. 2026-04-14)', required: true },
+      attendees: { type: 'string', label: 'Attendees (names + roles)', required: true },
+      raw_notes: { type: 'string', label: 'Raw meeting notes (paste freely, any format)', required: true },
+    },
+  },
+  {
+    slug: 'trelexa-weekly-ops-report',
+    name: '[Trelexa] Weekly Ops Report',
+    description: 'Generate the weekly operations report across all portfolio brands with traffic-light status and priorities.',
+    category: 'trelexa',
+    icon: 'trending-up',
+    agentTeamJson: ['analyst', 'copywriter', 'editor'],
+    defaultPrompt:
+      'Generate the weekly operations report across all portfolio brands.\n\nBrand updates (bullet points per brand): {{brand_updates}}\nKey metrics this week: {{key_metrics}}\nBlockers: {{blockers}}\n\nDeliver a structured weekly ops report:\n\n1. Executive Summary (150 words max) — overall portfolio health, top 3 highlights, top 1–2 concerns\n2. Per-Brand Status — for each brand mentioned in {{brand_updates}} (Qalitex, TheoSym, Trelexa, Care Europe, Nourify, Sam Sammane, QGI, Cowork-Claw, AimFox, Instantly):\n   - Status: 🟢 On Track / 🟡 At Risk / 🔴 Blocked\n   - 2–3 bullet updates from the brand_updates input\n   - One sentence on next week\'s priority\n3. Metrics Dashboard — table of {{key_metrics}} formatted as: | Metric | This Week | Last Week | Delta | Trend |\n4. Content Published This Week — bullet list of blog posts, press releases, or social campaigns launched\n5. Outreach Stats — Instantly campaigns active, emails sent, reply rate; AimFox connections sent, acceptance rate\n6. Revenue Update — any new deals, renewals, or revenue events from the updates\n7. Blockers & Escalations — from {{blockers}}: for each blocker, format as: Blocker | Brand | Impact | Owner | Proposed Resolution\n8. Priorities Next Week — top 5 cross-portfolio priorities, ranked\n\nFormat: markdown with clear section headers. Traffic-light emojis for brand status. Keep language concise and factual.',
+    paramsSchema: {
+      brand_updates: { type: 'string', label: 'Brand updates — paste bullet points per brand', required: true },
+      key_metrics: { type: 'string', label: 'Key metrics this week (paste as-is)', required: true },
+      blockers: { type: 'string', label: 'Blockers or risks (one per line)', required: false },
+    },
+  },
+
+  // ── Trelexa Hub — Campaigns & Outreach ───────────────────────────────────
+  {
+    slug: 'trelexa-instantly-campaign',
+    name: '[Trelexa] Instantly Campaign Designer',
+    description: 'Design a complete Instantly cold email campaign with 3-email sequence, lead list criteria, and scheduling config.',
+    category: 'trelexa',
+    icon: 'send',
+    agentTeamJson: ['copywriter', 'analyst', 'editor'],
+    defaultPrompt:
+      'Design a complete Instantly cold email campaign.\n\nCampaign name: {{campaign_name}}\nTrigger event: {{trigger_event}}\nTarget vertical: {{target_vertical}} (supplements / cosmetics / food)\nProspect risk description: {{prospect_risk}}\nSending account: {{sending_account}} (alex / aria / kelly / lily / marry @qalitex-lab.com)\n\nDeliver the following campaign assets:\n\n1. 3-Email Sequence — strict rules for every email:\n   - Pure plain text, zero HTML, zero links, zero images\n   - Under 80 words per email body (not counting subject line)\n   - Subject line must look forwarded or colleague-sent (e.g. "Fwd: re: the {{trigger_event}}" or "quick heads up")\n   - No company name, no logo, no CTA buttons\n   - No links of any kind\n   - Tone: peer-to-peer, genuine concern, zero sales language\n   - Variables to use: {{trigger}}, {{triggerDetail}}, {{productCategory}}, {{risk}}\n   Email 1 (Day 0): alert to the trigger event and its direct risk; end with a soft open-ended question\n   Email 2 (Day 3): one specific consequence or data point; lightly references Email 1\n   Email 3 (Day 7): final check-in; acknowledge they\'re busy; one clear next step framed as a favour\n   Format each as: [Subject] / [Body]\n\n2. Lead List Criteria for SuperSearch — ICP filters:\n   - Industries to target (based on {{target_vertical}})\n   - Job titles to include (decision-makers, quality/regulatory/procurement)\n   - Company size range\n   - Geography (default: US + EU)\n   - Keywords to search\n   - Exclusion filters\n\n3. Campaign Variables Reference — define what each variable maps to for this specific campaign:\n   {{trigger}}, {{triggerDetail}}, {{productCategory}}, {{risk}}\n\n4. Scheduling Config:\n   - Sending account: {{sending_account}}@qalitex-lab.com\n   - Send days: Monday–Friday\n   - Send window: 8:00 AM – 4:00 PM Pacific\n   - Daily send limit: recommend based on account warmup stage (new / warmed / seasoned)\n   - Follow-up spacing: as per sequence above',
+    paramsSchema: {
+      campaign_name: { type: 'string', label: 'Campaign name', required: true },
+      trigger_event: { type: 'string', label: 'Trigger event (e.g. FDA recall, contamination news, regulatory change)', required: true },
+      target_vertical: { type: 'string', label: 'Target vertical (supplements / cosmetics / food)', required: true },
+      prospect_risk: { type: 'string', label: 'How this trigger risks the prospect\'s business', required: true },
+      sending_account: { type: 'string', label: 'Sending account (alex / aria / kelly / lily / marry)', required: true },
+    },
+  },
+  {
+    slug: 'trelexa-aimfox-linkedin-campaign',
+    name: '[Trelexa] AimFox LinkedIn Campaign',
+    description: 'Design a LinkedIn outreach campaign for AimFox automation with connection message, follow-up sequence, and prospect criteria.',
+    category: 'trelexa',
+    icon: 'linkedin',
+    agentTeamJson: ['copywriter', 'researcher', 'analyst'],
+    defaultPrompt:
+      'Design a LinkedIn outreach campaign for AimFox automation.\n\nBrand: {{brand}}\nTarget persona — title: {{target_title}}, industry: {{target_industry}}\nCampaign goal: {{campaign_goal}} (connect / engage / pitch)\nConnection message angle: {{connection_angle}}\nFollow-up goal: {{followup_goal}}\n\nDeliver the following AimFox campaign assets:\n\n1. Connection Request Message (300 characters max):\n   - Personalised, references their role or industry\n   - No pitch, no links\n   - Ends with a natural reason to connect\n   - Angle: {{connection_angle}}\n\n2. Follow-Up Sequence (3 messages):\n   Message 1 (Day 1 after connection accepted):\n   - Thank for connecting, add value immediately (insight, resource, or observation)\n   - Under 100 words, no pitch\n   Message 2 (Day 3):\n   - Soft bridge from value to {{brand}}\'s relevance\n   - Under 120 words\n   - Soft CTA: ask a question or propose a quick call\n   Message 3 (Day 7):\n   - Follow up on Message 2 if no reply\n   - Under 80 words\n   - Clear but non-pushy CTA\n\n3. Profile View Strategy — recommended profiles to view before sending connection request (company type, seniority level) to warm up the sequence\n\n4. Content Engagement Plan — 3 content engagement touchpoints before or alongside outreach:\n   - What type of posts to like/comment on (topics relevant to {{target_industry}})\n   - Comment templates (2 options) that establish credibility without being promotional\n\n5. Prospect Filtering Criteria for AimFox:\n   - Job titles (include list)\n   - Industries (include list)\n   - Geography\n   - Company size\n   - Exclusion filters (competitors, current clients, irrelevant roles)\n   - Estimated audience size\n\nTone: human, peer-to-peer, no corporate speak.',
+    paramsSchema: {
+      brand: { type: 'string', label: 'Brand running the campaign', required: true },
+      target_title: { type: 'string', label: 'Target job title(s)', required: true },
+      target_industry: { type: 'string', label: 'Target industry', required: true },
+      campaign_goal: { type: 'string', label: 'Campaign goal (connect / engage / pitch)', required: true },
+      connection_angle: { type: 'string', label: 'Connection message angle (e.g. shared industry interest, mutual connection, recent news)', required: true },
+      followup_goal: { type: 'string', label: 'Follow-up goal (e.g. book a discovery call, share a resource)', required: true },
+    },
+  },
+
+  // ── Trelexa Hub — Video & Multimedia ─────────────────────────────────────
+  {
+    slug: 'trelexa-video-script',
+    name: '[Trelexa] Video Script',
+    description: 'Write a full video script for YouTube, TikTok, or Instagram Reels with hook, B-roll notes, CTA, and thumbnail concept.',
+    category: 'trelexa',
+    icon: 'video',
+    agentTeamJson: ['copywriter', 'designer', 'editor'],
+    defaultPrompt:
+      'Write a video script for the following brand and platform.\n\nBrand: {{brand}}\nPlatform: {{platform}} (youtube-long / youtube-short / tiktok / instagram-reel)\nTopic: {{topic}}\nDuration: {{duration}} (30s / 60s / 3min / 10min)\nCTA: {{cta}}\n\nDeliver a complete production-ready script:\n\n1. Hook (first 3 seconds) — the one line that stops the scroll; for YouTube: bold statement or curiosity gap; for TikTok/Reels: action-first or shock value; for YouTube-short: pattern interrupt\n\n2. Script Body — formatted as: [SPOKEN] dialogue | [B-ROLL] visual direction | [ON-SCREEN TEXT] overlay copy\n   - Break into sections appropriate for {{duration}}\n   - youtube-long (10min): 4–6 sections with clear transitions\n   - youtube-short / 60s: 3 sections (hook → body → CTA)\n   - tiktok / instagram-reel: 2–3 tight sections\n   - Include specific B-roll directions (not vague — e.g. "[B-ROLL: close-up of supplement label being turned over]")\n   - On-screen text overlays: include exact copy for lower-thirds and emphasis callouts\n\n3. CTA Placement — where {{cta}} appears in the script (mid-roll and/or end), exact spoken line, and any on-screen CTA graphic direction\n\n4. Thumbnail Concept — describe the ideal thumbnail: foreground subject, background, text overlay (max 4 words), emotion/expression, colour contrast notes\n\n5. Description + Hashtags:\n   - First 150 chars (what appears before "more"): keyword-rich hook\n   - Timestamps (for youtube-long: fill in; for others: N/A)\n   - 5–10 hashtags relevant to {{brand}} and {{topic}}\n\nTone: native to {{platform}}. Avoid stiff corporate language.',
+    paramsSchema: {
+      brand: { type: 'string', label: 'Brand (qalitex / theosym / trelexa / care-europe / nourify / sam-sammane)', required: true },
+      platform: { type: 'string', label: 'Platform (youtube-long / youtube-short / tiktok / instagram-reel)', required: true },
+      topic: { type: 'string', label: 'Video topic', required: true },
+      duration: { type: 'string', label: 'Duration (30s / 60s / 3min / 10min)', required: true },
+      cta: { type: 'string', label: 'Call to action (e.g. subscribe, visit website, book a call)', required: true },
+    },
+  },
+  {
+    slug: 'trelexa-video-edit-brief',
+    name: '[Trelexa] Video Editing Brief (Gemini + Claude CLI)',
+    description: 'Create a video editing brief combining Gemini CLI for visual analysis and Claude CLI for script/copy refinement.',
+    category: 'trelexa',
+    icon: 'film',
+    agentTeamJson: ['designer', 'copywriter', 'analyst', 'editor'],
+    defaultPrompt:
+      'Create a video editing brief that combines Gemini CLI (visual analysis) and Claude CLI (script/copy refinement).\n\nRaw footage description: {{footage_description}}\nTarget platform: {{platform}} (youtube-long / youtube-short / tiktok / instagram-reel)\nBrand: {{brand}}\nDesired style: {{style}} (e.g. documentary, fast-cut, talking-head, product demo, vlog)\n\nDeliver a complete dual-CLI editing brief:\n\n## GEMINI CLI TASKS (Visual Analysis & Suggestions)\nInstructions for running Gemini CLI on the raw footage:\n- Frame analysis prompts: what to look for in key frames (lighting quality, brand colours present, talking-head framing, product visibility)\n- Scene selection guidance: which types of shots to prioritise for the edit\n- Visual quality flags: what Gemini should identify and reject (shaky footage, bad exposure, off-brand visuals)\n- Colour grading reference: brand colours for {{brand}} to match\n\n## CLAUDE CLI TASKS (Script & Copy Refinement)\nInstructions for running Claude CLI on the script/transcript:\n- Hook refinement: rewrite the first 3 seconds for maximum retention\n- Pacing notes: flag sections that run long or slow\n- On-screen text copy: generate or refine overlay text for each section\n- CTA copy: optimise the call to action for {{platform}}\n\n## EDITING TIMELINE\nFormatted as: | Timestamp | Section | Duration | Visual Direction | Audio/Spoken | On-Screen Text | Transition |\n- Intro (0:00–0:XX): hook + brand intro\n- Body sections (based on {{style}} and {{platform}})\n- Outro (last 5–10 sec): CTA + end screen\n\n## POST-PRODUCTION NOTES\n- Music mood: describe the energy and genre that fits {{style}} and {{brand}}\n- Colour grading: brand colour reference with hex codes, mood direction\n- Export settings per platform:\n  - youtube-long: 1920×1080, H.264, 24fps, stereo audio 48kHz\n  - youtube-short / tiktok / instagram-reel: 1080×1920, H.264, 30fps\n\n## THUMBNAIL VARIANTS\n3 thumbnail concepts: | Variant | Foreground | Background | Text Overlay (max 4 words) | Emotion/Hook |\n\nNote any footage gaps where additional B-roll or graphics will be needed.',
+    paramsSchema: {
+      footage_description: { type: 'string', label: 'Raw footage description (what was filmed, approximate clips)', required: true },
+      platform: { type: 'string', label: 'Target platform (youtube-long / youtube-short / tiktok / instagram-reel)', required: true },
+      brand: { type: 'string', label: 'Brand (qalitex / theosym / trelexa / care-europe / nourify / sam-sammane)', required: true },
+      style: { type: 'string', label: 'Desired edit style (e.g. documentary, fast-cut, talking-head, product demo)', required: true },
+    },
+  },
 ]
 
 export async function seedTemplates(): Promise<void> {
