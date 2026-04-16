@@ -6,9 +6,15 @@ import { getUserPlan } from '@/lib/billing/check-subscription'
 import { isSuperAdmin } from '@/lib/auth/super-admin'
 
 export async function GET(request: Request) {
-  const { searchParams, origin } = new URL(request.url)
+  const url = new URL(request.url)
+  const searchParams = url.searchParams
   const code = searchParams.get('code')
   const next = searchParams.get('next') ?? '/'
+
+  // Use the host header to build the origin, not the internal Docker address
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || url.host
+  const proto = request.headers.get('x-forwarded-proto') || 'https'
+  const origin = `${proto}://${host}`
 
   if (code) {
     const cookieStore = await cookies()
