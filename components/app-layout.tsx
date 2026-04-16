@@ -172,27 +172,11 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
     return () => clearInterval(interval)
   }, [])
 
-  // BYO-key gate: redirect to onboarding if no Anthropic key configured
+  // API key check removed from global gate — key is only required at task creation time.
+  // Users can browse the app, view templates, and set up their profile without a key.
+  // The /onboarding/key page is still available for users who want to add their key proactively.
   const router = useRouter()
   const pathname = usePathname()
-  useEffect(() => {
-    // Skip the key check on auth and onboarding pages to avoid redirect loops
-    if (pathname?.startsWith('/auth') || pathname?.startsWith('/onboarding')) return
-
-    const checkApiKey = async () => {
-      try {
-        const res = await fetch('/api/api-keys/check?agent=claude')
-        if (!res.ok) return // not authenticated or other error — skip
-        const data = await res.json()
-        if (data.hasKey === false) {
-          router.push('/onboarding/key')
-        }
-      } catch {
-        // Network error — skip redirect
-      }
-    }
-    checkApiKey()
-  }, [pathname, router])
 
   const toggleSidebar = useCallback(() => {
     updateSidebarOpen(!isSidebarOpen)
