@@ -11,6 +11,7 @@ type Provider = 'openai' | 'gemini' | 'cursor' | 'anthropic' | 'aigateway'
 /**
  * Get API keys for the currently authenticated user
  * Returns user's keys if available, otherwise falls back to system env vars
+ * Also returns subscription credentials (claude-subscription, gemini-subscription) if present
  */
 export async function getUserApiKeys(): Promise<{
   OPENAI_API_KEY: string | undefined
@@ -18,6 +19,8 @@ export async function getUserApiKeys(): Promise<{
   CURSOR_API_KEY: string | undefined
   ANTHROPIC_API_KEY: string | undefined
   AI_GATEWAY_API_KEY: string | undefined
+  CLAUDE_SUBSCRIPTION_CREDENTIALS: string | undefined
+  GEMINI_SUBSCRIPTION_CREDENTIALS: string | undefined
 }> {
   const session = await getServerSession()
 
@@ -28,6 +31,8 @@ export async function getUserApiKeys(): Promise<{
     CURSOR_API_KEY: process.env.CURSOR_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     AI_GATEWAY_API_KEY: process.env.AI_GATEWAY_API_KEY,
+    CLAUDE_SUBSCRIPTION_CREDENTIALS: undefined as string | undefined,
+    GEMINI_SUBSCRIPTION_CREDENTIALS: undefined as string | undefined,
   }
 
   if (!session?.user?.id) {
@@ -55,6 +60,12 @@ export async function getUserApiKeys(): Promise<{
           break
         case 'aigateway':
           apiKeys.AI_GATEWAY_API_KEY = decryptedValue
+          break
+        case 'claude-subscription':
+          apiKeys.CLAUDE_SUBSCRIPTION_CREDENTIALS = decryptedValue
+          break
+        case 'gemini-subscription':
+          apiKeys.GEMINI_SUBSCRIPTION_CREDENTIALS = decryptedValue
           break
       }
     })
@@ -101,4 +112,52 @@ export async function getUserApiKey(provider: Provider): Promise<string | undefi
   }
 
   return systemKeys[provider]
+}
+
+type ClaudeOAuthCredentials = {
+  accessToken: string
+  refreshToken: string
+  expiresAt: number
+  subscriptionType: string
+}
+
+/**
+ * Get subscription credentials for the currently authenticated user
+ * Returns parsed Claude OAuth credentials or raw Gemini token if stored
+ */
+export async function getUserSubscriptionCredentials(): Promise<{
+  claudeSubscription: ClaudeOAuthCredentials | null
+  geminiSubscription: string | null
+}> {
+  const session = await getServerSession()
+  const result: { claudeSubscription: ClaudeOAuthCredentials | null; geminiSubscription: string | null } = {
+    claudeSubscription: null,
+    geminiSubscription: null,
+  }
+
+  if (!session?.user?.id) return result
+
+  try {
+    const userKeys = await db
+      .select()
+      .from(keys)
+      .where(and(eq(keys.userId, session.user.id)))
+
+    for (const key of userKeys) {
+      if (key.provider === 'claude-subscription') {
+        try {
+          const parsed = JSON.parse(decrypt(key.value))
+          result.claudeSubscription = parsed.claudeAiOauth ?? null
+        } catch {
+          // ignore malformed
+        }
+      } else if (key.provider === 'gemini-subscription') {
+        result.geminiSubscription = decrypt(key.value)
+      }
+    }
+  } catch (error) {
+    console.error('Error fetching subscription credentials:', error)
+  }
+
+  return result
 }
