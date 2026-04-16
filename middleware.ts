@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(authUrl)
   }
 
-  if (isSuperAdmin(user.email)) return response
+  if (isSuperAdmin(user.email) || user.email?.endsWith('@qgi.dev')) return response
 
   if (isAuthOnly(pathname)) return response
 

@@ -24,7 +24,7 @@ export async function GET(request: Request) {
         try {
           const dbUser = await getOrCreateUser(user)
 
-          if (isSuperAdmin(user.email)) {
+          if (isSuperAdmin(user.email) || user.email?.endsWith('@qgi.dev')) {
             cookieStore.set('_sub_status', 'active', {
               path: '/',
               httpOnly: true,
