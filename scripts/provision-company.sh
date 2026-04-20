@@ -184,6 +184,8 @@ services:
     network_mode: host
     environment:
       - PORT=${PORT}
+    volumes:
+      - /var/lib/cowork-artifacts:/var/lib/cowork-artifacts
     labels:
       - \"traefik.enable=true\"
       - \"traefik.http.routers.cw-${COMPANY}.rule=Host(\`${SUBDOMAIN}\`)\"
