@@ -2,7 +2,15 @@ import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
 import { isSuperAdmin, isInternalTeam } from '@/lib/auth/super-admin'
 
-const PUBLIC_PREFIXES = ['/auth', '/api/auth', '/api/billing/webhook', '/api/waitlist', '/tutorial', '/onboarding']
+const PUBLIC_PREFIXES = [
+  '/auth',
+  '/api/auth',
+  '/api/billing/webhook',
+  '/api/waitlist',
+  '/api/health',
+  '/tutorial',
+  '/onboarding',
+]
 const AUTH_ONLY_PREFIXES = ['/settings/billing', '/api/billing']
 
 function isPublic(pathname: string): boolean {
