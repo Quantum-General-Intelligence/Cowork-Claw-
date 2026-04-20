@@ -2,9 +2,6 @@ import type { SandboxInstance } from './provider'
 
 type Sandbox = SandboxInstance
 
-// Project directory where repo is cloned
-export const PROJECT_DIR = '/vercel/sandbox/project'
-
 export interface CommandResult {
   success: boolean
   exitCode?: number
@@ -28,7 +25,6 @@ export async function runCommandInSandbox(
   try {
     const result = await sandbox.runCommand(command, args)
 
-    // Handle stdout and stderr properly
     let stdout = ''
     let stderr = ''
 
@@ -64,16 +60,18 @@ export async function runCommandInSandbox(
   }
 }
 
-// Helper function to run command in project directory
+/**
+ * Run a shell command in the sandbox's project working directory.
+ * Uses the instance's `projectDir` so it works for any SandboxInstance
+ * implementation (persistent user env or future providers).
+ */
 export async function runInProject(sandbox: Sandbox, command: string, args: string[] = []): Promise<CommandResult> {
-  // Properly escape arguments for shell execution
   const escapeArg = (arg: string) => {
-    // Escape single quotes by replacing ' with '\''
     return `'${arg.replace(/'/g, "'\\''")}'`
   }
 
   const fullCommand = args.length > 0 ? `${command} ${args.map(escapeArg).join(' ')}` : command
-  const cdCommand = `cd ${PROJECT_DIR} && ${fullCommand}`
+  const cdCommand = `cd ${sandbox.projectDir} && ${fullCommand}`
   return await runCommandInSandbox(sandbox, 'sh', ['-c', cdCommand])
 }
 
@@ -90,10 +88,8 @@ export async function runStreamingCommandInSandbox(
     let stderr = ''
 
     try {
-      // stdout is always a function that returns a promise
       if (typeof result.stdout === 'function') {
         stdout = await result.stdout()
-        // Process the complete output for JSON lines
         if (options.onJsonLine) {
           const lines = stdout.split('\n')
           for (const line of lines) {
@@ -103,26 +99,21 @@ export async function runStreamingCommandInSandbox(
                 const jsonData = JSON.parse(trimmedLine)
                 options.onJsonLine(jsonData)
               } catch {
-                // Not valid JSON, ignore
+                // Not valid JSON
               }
             }
           }
         }
-        if (options.onStdout) {
-          options.onStdout(stdout)
-        }
+        if (options.onStdout) options.onStdout(stdout)
       }
     } catch {
       // Failed to read stdout
     }
 
     try {
-      // stderr is always a function that returns a promise
       if (typeof result.stderr === 'function') {
         stderr = await result.stderr()
-        if (options.onStderr) {
-          options.onStderr(stderr)
-        }
+        if (options.onStderr) options.onStderr(stderr)
       }
     } catch {
       // Failed to read stderr

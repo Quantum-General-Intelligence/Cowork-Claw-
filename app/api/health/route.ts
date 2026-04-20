@@ -1,12 +1,11 @@
 /**
- * Health endpoint used by the external uptime monitor and by the /api/health
- * line in the preflight checklist. Returns static booleans — no dynamic values,
- * no IDs, no paths, per AGENTS.md.
+ * Health endpoint used by external uptime monitors. Returns static booleans —
+ * no dynamic values, no IDs, no paths, per AGENTS.md.
  */
 import { NextResponse } from 'next/server'
 import postgres from 'postgres'
 import { getEnv } from '@/lib/env'
-import { countCoworkSandboxes } from '@/lib/sandbox/concurrency'
+import { pingVps } from '@/lib/company/vps-client'
 import { statfsSync } from 'fs'
 
 export const dynamic = 'force-dynamic'
@@ -26,17 +25,9 @@ async function checkDb(): Promise<boolean> {
   }
 }
 
-async function checkSshToDocker(): Promise<boolean> {
+async function checkVps(): Promise<boolean> {
   try {
-    const env = getEnv()
-    const keyPem = Buffer.from(env.SANDBOX_SSH_KEY, 'base64').toString('utf-8')
-    await countCoworkSandboxes({
-      host: env.SANDBOX_SSH_HOST,
-      port: env.SANDBOX_SSH_PORT,
-      username: env.SANDBOX_SSH_USER,
-      privateKey: keyPem,
-    })
-    return true
+    return await pingVps()
   } catch {
     return false
   }
@@ -54,8 +45,8 @@ function checkDiskFree(): boolean {
 }
 
 export async function GET() {
-  const [db, sshToDocker] = await Promise.all([checkDb(), checkSshToDocker()])
+  const [db, vps] = await Promise.all([checkDb(), checkVps()])
   const diskFree = checkDiskFree()
-  const ok = db && sshToDocker && diskFree
-  return NextResponse.json({ ok, db, sshToDocker, diskFree }, { status: ok ? 200 : 503 })
+  const ok = db && vps && diskFree
+  return NextResponse.json({ ok, db, vps, diskFree }, { status: ok ? 200 : 503 })
 }

@@ -17,11 +17,11 @@ import { sessionAtom } from '@/lib/atoms/session'
 import { githubConnectionAtom } from '@/lib/atoms/github-connection'
 import { GitHubIcon } from '@/components/icons/github-icon'
 import { ApiKeysDialog } from '@/components/api-keys-dialog'
-import { SandboxesDialog } from '@/components/sandboxes-dialog'
 import { ThemeToggle } from '@/components/theme-toggle'
-import { Key, Server } from 'lucide-react'
+import { Key } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { getEnabledAuthProviders } from '@/lib/auth/providers'
+import { createClient } from '@/utils/supabase/client'
 
 interface RateLimitInfo {
   used: number
@@ -35,7 +35,6 @@ export function SignOut({ user, authProvider }: Pick<Session, 'user' | 'authProv
   const githubConnection = useAtomValue(githubConnectionAtom)
   const setGitHubConnection = useSetAtom(githubConnectionAtom)
   const [showApiKeysDialog, setShowApiKeysDialog] = useState(false)
-  const [showSandboxesDialog, setShowSandboxesDialog] = useState(false)
   const [rateLimit, setRateLimit] = useState<RateLimitInfo | null>(null)
 
   // Check which auth providers are enabled
@@ -62,6 +61,30 @@ export function SignOut({ user, authProvider }: Pick<Session, 'user' | 'authProv
     } catch (error) {
       console.error('Failed to disconnect GitHub:', error)
       toast.error('Failed to disconnect GitHub')
+    }
+  }
+
+  const handleGitHubConnect = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.linkIdentity({
+        provider: 'github',
+        options: {
+          scopes: 'repo read:user user:email',
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(window.location.pathname)}`,
+        },
+      })
+      if (error) {
+        console.error('Failed to start GitHub link:', error)
+        toast.error('Failed to connect GitHub')
+        return
+      }
+      if (data?.url) {
+        window.location.href = data.url
+      }
+    } catch (error) {
+      console.error('Failed to connect GitHub:', error)
+      toast.error('Failed to connect GitHub')
     }
   }
 
@@ -140,13 +163,8 @@ export function SignOut({ user, authProvider }: Pick<Session, 'user' | 'authProv
           API Keys
         </DropdownMenuItem>
 
-        <DropdownMenuItem onClick={() => setShowSandboxesDialog(true)} className="cursor-pointer">
-          <Server className="h-4 w-4 mr-2" />
-          Sandboxes
-        </DropdownMenuItem>
-
-        {/* Only show GitHub Connect/Disconnect for Vercel users when GitHub is enabled */}
-        {authProvider === 'vercel' && hasGitHub && (
+        {/* Show GitHub Connect/Disconnect for users whose primary provider is NOT GitHub */}
+        {authProvider !== 'github' && hasGitHub && (
           <>
             {githubConnection.connected ? (
               <DropdownMenuItem onClick={handleGitHubDisconnect} className="cursor-pointer">
@@ -154,10 +172,7 @@ export function SignOut({ user, authProvider }: Pick<Session, 'user' | 'authProv
                 Disconnect
               </DropdownMenuItem>
             ) : (
-              <DropdownMenuItem
-                onClick={() => (window.location.href = '/api/auth/github/signin')}
-                className="cursor-pointer"
-              >
+              <DropdownMenuItem onClick={handleGitHubConnect} className="cursor-pointer">
                 <GitHubIcon className="h-4 w-4 mr-2" />
                 Connect
               </DropdownMenuItem>
@@ -185,7 +200,6 @@ export function SignOut({ user, authProvider }: Pick<Session, 'user' | 'authProv
       </DropdownMenuContent>
 
       <ApiKeysDialog open={showApiKeysDialog} onOpenChange={setShowApiKeysDialog} />
-      <SandboxesDialog open={showSandboxesDialog} onOpenChange={setShowSandboxesDialog} />
     </DropdownMenu>
   )
 }

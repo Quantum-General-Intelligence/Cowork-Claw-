@@ -1,16 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSessionFromReq } from '@/lib/session/server'
+import { getServerSession } from '@/lib/session/get-server-session'
 import { db } from '@/lib/db/client'
 import { keys } from '@/lib/db/schema'
 import { eq, and } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
-import { encrypt, decrypt } from '@/lib/crypto'
+import { encrypt } from '@/lib/crypto'
 
 type Provider = 'openai' | 'gemini' | 'cursor' | 'anthropic' | 'aigateway'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const session = await getSessionFromReq(req)
+    const session = await getServerSession()
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getSessionFromReq(req)
+    const session = await getServerSession()
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(req: NextRequest) {
   try {
-    const session = await getSessionFromReq(req)
+    const session = await getServerSession()
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

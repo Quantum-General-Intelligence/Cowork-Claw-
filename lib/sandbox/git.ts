@@ -1,5 +1,5 @@
 import type { SandboxInstance as Sandbox } from './provider'
-import { runCommandInSandbox, runInProject } from './commands'
+import { runInProject } from './commands'
 import { TaskLogger } from '@/lib/utils/task-logger'
 
 export async function pushChangesToBranch(
@@ -69,32 +69,5 @@ export async function pushChangesToBranch(
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred'
     await logger.info('Error pushing changes')
     return { success: false }
-  }
-}
-
-export async function shutdownSandbox(sandbox?: Sandbox): Promise<{ success: boolean; error?: string }> {
-  try {
-    // If we have a sandbox reference, try to kill any running processes
-    if (sandbox) {
-      try {
-        // Try to kill any long-running processes that might be active
-        await runCommandInSandbox(sandbox, 'pkill', ['-f', 'node'])
-        await runCommandInSandbox(sandbox, 'pkill', ['-f', 'python'])
-        await runCommandInSandbox(sandbox, 'pkill', ['-f', 'npm'])
-        await runCommandInSandbox(sandbox, 'pkill', ['-f', 'yarn'])
-        await runCommandInSandbox(sandbox, 'pkill', ['-f', 'pnpm'])
-      } catch {
-        // Best effort - don't fail if we can't kill processes
-        console.log('Best effort process cleanup completed')
-      }
-    }
-
-    // Note: Vercel Sandbox automatically shuts down after timeout
-    // No explicit shutdown method available in current SDK
-    // The sandbox will be garbage collected and shut down automatically
-    return { success: true }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : 'Failed to shutdown sandbox'
-    return { success: false, error: errorMessage }
   }
 }

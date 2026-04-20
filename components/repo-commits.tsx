@@ -85,8 +85,6 @@ export function RepoCommits({ owner, repo }: RepoCommitsProps) {
     selectedAgent: string
     selectedModel: string
     installDependencies: boolean
-    maxDuration: number
-    keepAlive: boolean
   }) => {
     try {
       const repoUrl = `https://github.com/${owner}/${repo}`
@@ -101,7 +99,6 @@ export function RepoCommits({ owner, repo }: RepoCommitsProps) {
         selectedAgent: config.selectedAgent,
         selectedModel: config.selectedModel,
         installDependencies: config.installDependencies,
-        maxDuration: config.maxDuration,
       })
 
       // Navigate to the new task page
@@ -120,8 +117,6 @@ export function RepoCommits({ owner, repo }: RepoCommitsProps) {
           selectedAgent: config.selectedAgent,
           selectedModel: config.selectedModel,
           installDependencies: config.installDependencies,
-          maxDuration: config.maxDuration,
-          keepAlive: config.keepAlive,
         }),
       })
 

@@ -94,9 +94,7 @@ export function TemplateModal({ slug, onClose, onSubmit }: TemplateModalProps) {
             <h3 className="text-lg font-semibold" style={{ color: 'var(--color-headline)' }}>
               {template.name}
             </h3>
-            {template.description && (
-              <p className="mt-1 text-sm text-muted-foreground">{template.description}</p>
-            )}
+            {template.description && <p className="mt-1 text-sm text-muted-foreground">{template.description}</p>}
             <div className="mt-4 space-y-3">
               {Object.entries(schema).map(([key, field]) => (
                 <div key={key}>

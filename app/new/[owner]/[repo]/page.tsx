@@ -2,7 +2,6 @@ import { cookies } from 'next/headers'
 import { HomePageContent } from '@/components/home-page-content'
 import { getServerSession } from '@/lib/session/get-server-session'
 import { getGitHubStars } from '@/lib/github-stars'
-import { getMaxSandboxDuration } from '@/lib/db/settings'
 
 interface NewRepoPageProps {
   params: Promise<{
@@ -16,14 +15,9 @@ export default async function NewRepoPage({ params }: NewRepoPageProps) {
 
   const cookieStore = await cookies()
   const installDependencies = cookieStore.get('install-dependencies')?.value === 'true'
-  const keepAlive = cookieStore.get('keep-alive')?.value === 'true'
   const enableBrowser = cookieStore.get('enable-browser')?.value === 'true'
 
   const session = await getServerSession()
-
-  // Get max sandbox duration for this user (user-specific > global > env var)
-  const maxSandboxDuration = await getMaxSandboxDuration(session?.user?.id)
-  const maxDuration = parseInt(cookieStore.get('max-duration')?.value || maxSandboxDuration.toString(), 10)
 
   const stars = await getGitHubStars()
 
@@ -32,10 +26,7 @@ export default async function NewRepoPage({ params }: NewRepoPageProps) {
       initialSelectedOwner={owner}
       initialSelectedRepo={repo}
       initialInstallDependencies={installDependencies}
-      initialMaxDuration={maxDuration}
-      initialKeepAlive={keepAlive}
       initialEnableBrowser={enableBrowser}
-      maxSandboxDuration={maxSandboxDuration}
       user={session?.user ?? null}
       initialStars={stars}
     />

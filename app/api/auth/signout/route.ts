@@ -10,6 +10,9 @@ export async function GET(req: NextRequest) {
   await supabase.auth.signOut()
 
   cookieStore.delete('_sub_status')
+  // One-shot cleanup: remove the pre-Supabase JWE session cookie so users who
+  // still have it from the legacy auth flow don't stay "half-signed-in".
+  cookieStore.delete('_user_session_')
 
   const next = req.nextUrl.searchParams.get('next') ?? '/'
   const url = isRelativeUrl(next) ? next : '/'

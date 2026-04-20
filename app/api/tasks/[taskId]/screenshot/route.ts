@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { db } from '@/lib/db/client'
-import { tasks } from '@/lib/db/schema'
-import { eq, and, isNull } from 'drizzle-orm'
 import { getServerSession } from '@/lib/session/get-server-session'
+import { getEnvInstanceForTask } from '@/lib/env/resolver'
 
 const ALLOWED_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp', 'gif']
 
@@ -37,64 +35,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Missing path parameter' }, { status: 400 })
     }
 
-    // Security: only serve files from /tmp/ directory
     if (!filePath.startsWith('/tmp/')) {
       return NextResponse.json({ error: 'Only /tmp/ files are accessible' }, { status: 403 })
     }
 
-    // Security: validate file extension is an image
     const ext = filePath.split('.').pop()?.toLowerCase()
     if (!ext || !ALLOWED_EXTENSIONS.includes(ext)) {
       return NextResponse.json({ error: 'Only image files are accessible' }, { status: 403 })
     }
 
-    // Security: prevent path traversal
     if (filePath.includes('..')) {
       return NextResponse.json({ error: 'Invalid path' }, { status: 403 })
     }
 
-    // Get task and verify ownership
-    const [task] = await db
-      .select()
-      .from(tasks)
-      .where(and(eq(tasks.id, taskId), eq(tasks.userId, session.user.id), isNull(tasks.deletedAt)))
-      .limit(1)
-
-    if (!task) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    const envResolved = await getEnvInstanceForTask(taskId, session.user.id)
+    if (!envResolved) {
+      return NextResponse.json({ error: 'Task environment is not ready' }, { status: 400 })
     }
 
-    if (!task.sandboxId) {
-      return NextResponse.json({ error: 'No active sandbox for this task' }, { status: 400 })
-    }
-
-    // Connect to sandbox and read the file as base64
-    const { getSandbox } = await import('@/lib/sandbox/sandbox-registry')
-    const { getSandboxProvider } = await import('@/lib/sandbox/factory')
-
-    let sandbox = getSandbox(taskId)
-
-    if (!sandbox) {
-      const sandboxToken = process.env.SANDBOX_VERCEL_TOKEN
-      const teamId = process.env.SANDBOX_VERCEL_TEAM_ID
-      const projectId = process.env.SANDBOX_VERCEL_PROJECT_ID
-
-      if (sandboxToken && teamId && projectId) {
-        sandbox = await getSandboxProvider().get({
-          sandboxId: task.sandboxId,
-          teamId,
-          projectId,
-          token: sandboxToken,
-        })
-      }
-    }
-
-    if (!sandbox) {
-      return NextResponse.json({ error: 'Could not connect to sandbox' }, { status: 503 })
-    }
-
-    // Read file as base64
-    const result = await sandbox.runCommand({
+    const result = await envResolved.instance.runCommand({
       cmd: 'base64',
       args: ['-w', '0', filePath],
     })

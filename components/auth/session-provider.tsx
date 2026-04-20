@@ -5,7 +5,6 @@ import { useSetAtom } from 'jotai'
 import { sessionAtom, sessionInitializedAtom } from '@/lib/atoms/session'
 import { githubConnectionAtom, githubConnectionInitializedAtom } from '@/lib/atoms/github-connection'
 import type { SessionUserInfo } from '@/lib/session/types'
-import type { GitHubConnection } from '@/lib/atoms/github-connection'
 import { createClient } from '@/utils/supabase/client'
 
 export function SessionProvider() {
@@ -21,46 +20,35 @@ export function SessionProvider() {
       try {
         const response = await fetch('/api/auth/info')
         const data: SessionUserInfo = await response.json()
-        setSession(data)
+        setSession({ user: data.user, authProvider: data.authProvider })
+        setGitHubConnection({ connected: !!data.githubConnected })
         setInitialized(true)
+        setGitHubInitialized(true)
       } catch (error) {
         console.error('Failed to fetch session:', error)
         setSession({ user: undefined })
-        setInitialized(true)
-      }
-    }
-
-    const fetchGitHubConnection = async () => {
-      try {
-        const response = await fetch('/api/auth/github/status')
-        const data: GitHubConnection = await response.json()
-        setGitHubConnection(data)
-        setGitHubInitialized(true)
-      } catch (error) {
-        console.error('Failed to fetch GitHub connection:', error)
         setGitHubConnection({ connected: false })
+        setInitialized(true)
         setGitHubInitialized(true)
       }
     }
 
-    const fetchAll = async () => {
-      await Promise.all([fetchSession(), fetchGitHubConnection()])
-    }
-
-    fetchAll()
+    fetchSession()
 
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
       if (session) {
-        fetchAll()
+        fetchSession()
       } else {
         setSession({ user: undefined })
+        setGitHubConnection({ connected: false })
         setInitialized(true)
+        setGitHubInitialized(true)
       }
     })
 
-    const handleFocus = () => fetchAll()
+    const handleFocus = () => fetchSession()
     window.addEventListener('focus', handleFocus)
 
     return () => {

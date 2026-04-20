@@ -12,7 +12,6 @@ export interface RuntimeEnv {
   SANDBOX_SSH_PORT: number
   SANDBOX_SSH_USER: string
   SANDBOX_SSH_KEY: string
-  MAX_CONCURRENT_SANDBOXES: number
   ARTIFACT_ROOT: string
 }
 
@@ -49,7 +48,6 @@ export function getEnv(): RuntimeEnv {
     SANDBOX_SSH_PORT: readInt('SANDBOX_SSH_PORT', 22),
     SANDBOX_SSH_USER: readString('SANDBOX_SSH_USER', false, 'root'),
     SANDBOX_SSH_KEY: readString('SANDBOX_SSH_KEY', true),
-    MAX_CONCURRENT_SANDBOXES: readInt('MAX_CONCURRENT_SANDBOXES', 8),
     ARTIFACT_ROOT: readString('ARTIFACT_ROOT', false, '/var/lib/cowork-artifacts'),
   }
   return cached

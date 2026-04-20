@@ -3,7 +3,7 @@ import { getUserGitHubToken } from '@/lib/github/user-token'
 
 export async function GET(request: NextRequest) {
   try {
-    const token = await getUserGitHubToken(request)
+    const token = await getUserGitHubToken()
 
     if (!token) {
       return NextResponse.json({ error: 'GitHub not connected' }, { status: 401 })

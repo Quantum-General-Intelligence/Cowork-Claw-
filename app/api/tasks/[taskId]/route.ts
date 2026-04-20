@@ -3,7 +3,6 @@ import { db } from '@/lib/db/client'
 import { tasks } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { createTaskLogger } from '@/lib/utils/task-logger'
-import { killSandbox } from '@/lib/sandbox/sandbox-registry'
 import { getServerSession } from '@/lib/session/get-server-session'
 
 interface RouteParams {
@@ -83,19 +82,9 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           .where(eq(tasks.id, taskId))
           .returning()
 
-        // Kill the sandbox immediately and aggressively
-        try {
-          const killResult = await killSandbox(taskId)
-          if (killResult.success) {
-            await logger.success('Sandbox killed successfully')
-          } else {
-            await logger.error('Failed to kill sandbox')
-          }
-        } catch (killError) {
-          console.error('Failed to kill sandbox during stop:', killError)
-          await logger.error('Failed to kill sandbox during stop')
-        }
-
+        // In the persistent-env model there is no sandbox container to kill.
+        // The executor loop polls the task status and will exit cleanly once
+        // it observes the `stopped` state written above.
         await logger.error('Task execution stopped by user')
 
         return NextResponse.json({

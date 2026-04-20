@@ -19,18 +19,10 @@ import {
   Code,
   MessageSquare,
   FileText,
-  Monitor,
-  Eye,
-  EyeOff,
-  RefreshCw,
-  Play,
-  StopCircle,
   MoreVertical,
   X,
   ExternalLink,
   Plus,
-  Maximize,
-  Minimize,
   Globe,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -43,8 +35,6 @@ import {
   setShowFilesPane as saveShowFilesPane,
   getShowCodePane,
   setShowCodePane as saveShowCodePane,
-  getShowPreviewPane,
-  setShowPreviewPane as saveShowPreviewPane,
   getShowChatPane,
   setShowChatPane as saveShowChatPane,
   getFilesPaneWidth,
@@ -94,7 +84,6 @@ import { PRStatusIcon } from '@/components/pr-status-icon'
 
 interface TaskDetailsProps {
   task: Task
-  maxSandboxDuration?: number
 }
 
 interface DiffData {
@@ -177,7 +166,7 @@ const DEFAULT_MODELS = {
   opencode: 'gpt-5',
 } as const
 
-export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps) {
+export function TaskDetails({ task }: TaskDetailsProps) {
   const [optimisticStatus, setOptimisticStatus] = useState<Task['status'] | null>(null)
   const [mcpServers, setMcpServers] = useState<Connector[]>([])
   const [loadingMcpServers, setLoadingMcpServers] = useState(false)
@@ -194,8 +183,6 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
     task.selectedModel || DEFAULT_MODELS[(task.selectedAgent as keyof typeof DEFAULT_MODELS) || 'claude'],
   )
   const [tryAgainInstallDeps, setTryAgainInstallDeps] = useState(task.installDependencies || false)
-  const [tryAgainMaxDuration, setTryAgainMaxDuration] = useState(task.maxDuration || maxSandboxDuration)
-  const [tryAgainKeepAlive, setTryAgainKeepAlive] = useState(task.keepAlive || false)
   const [tryAgainEnableBrowser, setTryAgainEnableBrowser] = useState(task.enableBrowser || false)
   const [deploymentUrl, setDeploymentUrl] = useState<string | null>(task.previewUrl || null)
   const [loadingDeployment, setLoadingDeployment] = useState(false)
@@ -211,32 +198,19 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
   const [subMode, setSubMode] = useState<'local' | 'remote'>('remote')
   const viewMode: 'local' | 'remote' | 'all' | 'all-local' =
     filesPane === 'files' ? (subMode === 'local' ? 'all-local' : 'all') : subMode
-  const [activeTab, setActiveTab] = useState<'code' | 'chat' | 'preview'>('code')
+  const [activeTab, setActiveTab] = useState<'code' | 'chat'>('code')
   const [showFilesList, setShowFilesList] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
-  const [sandboxTimeRemaining, setSandboxTimeRemaining] = useState<string | null>(null)
 
   // Desktop pane toggles - initialize from cookies
   const [showFilesPane, setShowFilesPane] = useState(() => getShowFilesPane())
   const [showCodePane, setShowCodePane] = useState(() => getShowCodePane())
-  const [showPreviewPane, setShowPreviewPane] = useState(() => getShowPreviewPane())
   const [showChatPane, setShowChatPane] = useState(() => getShowChatPane())
-  const [previewKey, setPreviewKey] = useState(0)
 
   // Pane widths for resizing
   const [filesPaneWidth, setFilesPaneWidth] = useState(() => getFilesPaneWidth())
   const [chatPaneWidth, setChatPaneWidth] = useState(() => getChatPaneWidth())
   const [resizingPane, setResizingPane] = useState<'files' | 'chat' | null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
-  const [isPreviewFullscreen, setIsPreviewFullscreen] = useState(false)
-  const [isRestartingDevServer, setIsRestartingDevServer] = useState(false)
-  const [isStoppingSandbox, setIsStoppingSandbox] = useState(false)
-  const [isStartingSandbox, setIsStartingSandbox] = useState(false)
-  const [sandboxHealth, setSandboxHealth] = useState<'running' | 'starting' | 'error' | 'stopped' | 'not_available'>(
-    'starting',
-  )
-  const healthyCountRef = useRef<number>(0)
-  const lastHealthStatusRef = useRef<string | null>(null)
 
   // Initialize model correctly on mount and when agent changes in Try Again dialog
   useEffect(() => {
@@ -572,106 +546,6 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
       setOptimisticStatus(null)
     }
   }, [task.status, optimisticStatus])
-
-  // Calculate and update sandbox time remaining
-  useEffect(() => {
-    // Show timer if keepAlive is enabled and sandbox has been created (not pending)
-    if (!task.keepAlive || currentStatus === 'pending' || !task.createdAt) {
-      setSandboxTimeRemaining(null)
-      return
-    }
-
-    const calculateTimeRemaining = () => {
-      // Sandbox timeout starts from when it was CREATED, not completed
-      const createdTime = new Date(task.createdAt!).getTime()
-      const now = Date.now()
-      const maxDurationMs = (task.maxDuration || 300) * 60 * 1000 // maxDuration is in minutes
-      const elapsed = now - createdTime
-      const remaining = maxDurationMs - elapsed
-
-      if (remaining <= 0) {
-        return null
-      }
-
-      const hours = Math.floor(remaining / (60 * 60 * 1000))
-      const minutes = Math.floor((remaining % (60 * 60 * 1000)) / (60 * 1000))
-
-      return `${hours}h ${minutes}m`
-    }
-
-    // Update immediately
-    setSandboxTimeRemaining(calculateTimeRemaining())
-
-    // Update every minute
-    const interval = setInterval(() => {
-      setSandboxTimeRemaining(calculateTimeRemaining())
-    }, 60000) // 60 seconds
-
-    return () => clearInterval(interval)
-  }, [currentStatus, task.keepAlive, task.createdAt])
-
-  // Periodic sandbox health check
-  useEffect(() => {
-    if (!task.sandboxUrl) {
-      setSandboxHealth('not_available')
-      healthyCountRef.current = 0
-      lastHealthStatusRef.current = null
-      return
-    }
-
-    // Set to starting initially until we confirm it's healthy
-    setSandboxHealth('starting')
-
-    const checkHealth = async () => {
-      try {
-        const response = await fetch(`/api/tasks/${task.id}/sandbox-health`)
-        if (response.ok) {
-          const data = await response.json()
-          const currentStatus = data.status
-
-          // If status is 'running', require it to be stable for 2 checks (4 seconds)
-          if (currentStatus === 'running') {
-            if (lastHealthStatusRef.current === 'running') {
-              healthyCountRef.current += 1
-              // Only set to running after 2 consecutive healthy checks (4 seconds)
-              if (healthyCountRef.current >= 2) {
-                setSandboxHealth('running')
-              } else {
-                // Still show starting while we're waiting for stability
-                setSandboxHealth('starting')
-              }
-            } else {
-              // First healthy check, reset counter
-              healthyCountRef.current = 1
-              lastHealthStatusRef.current = 'running'
-              setSandboxHealth('starting')
-            }
-          } else {
-            // Not running, reset counter and set status immediately
-            healthyCountRef.current = 0
-            lastHealthStatusRef.current = currentStatus
-            setSandboxHealth(data.status)
-          }
-        }
-      } catch (error) {
-        console.error('Health check failed:', error)
-        healthyCountRef.current = 0
-        lastHealthStatusRef.current = null
-      }
-    }
-
-    // Check immediately
-    checkHealth()
-
-    // Check every 2 seconds
-    const interval = setInterval(checkHealth, 2000)
-
-    return () => {
-      clearInterval(interval)
-      healthyCountRef.current = 0
-      lastHealthStatusRef.current = null
-    }
-  }, [task.id, task.sandboxUrl])
 
   const getAgentLogo = (agent: string | null) => {
     if (!agent) return null
@@ -1118,14 +992,6 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
             break
           case 'Digit3':
             event.preventDefault()
-            setShowPreviewPane((prev) => {
-              const newValue = !prev
-              saveShowPreviewPane(newValue)
-              return newValue
-            })
-            break
-          case 'Digit4':
-            event.preventDefault()
             setShowChatPane((prev) => {
               const newValue = !prev
               saveShowChatPane(newValue)
@@ -1295,8 +1161,6 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
           selectedAgent,
           selectedModel,
           installDependencies: tryAgainInstallDeps,
-          maxDuration: tryAgainMaxDuration,
-          keepAlive: tryAgainKeepAlive,
           enableBrowser: tryAgainEnableBrowser,
         }),
       })
@@ -1339,77 +1203,6 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
     } finally {
       setIsDeleting(false)
       setShowDeleteDialog(false)
-    }
-  }
-
-  const handleRestartDevServer = async () => {
-    setIsRestartingDevServer(true)
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/restart-dev`, {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        toast.success('Dev server restarted successfully!')
-        // Refresh the preview after a short delay to allow server to start
-        setTimeout(() => {
-          setPreviewKey((prev) => prev + 1)
-        }, 2000)
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to restart dev server')
-      }
-    } catch (error) {
-      console.error('Error restarting dev server:', error)
-      toast.error('Failed to restart dev server')
-    } finally {
-      setIsRestartingDevServer(false)
-    }
-  }
-
-  const handleStopSandbox = async () => {
-    setIsStoppingSandbox(true)
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/stop-sandbox`, {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        toast.success('Sandbox stopped successfully!')
-        // Refresh tasks to update UI
-        await refreshTasks()
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to stop sandbox')
-      }
-    } catch (error) {
-      console.error('Error stopping sandbox:', error)
-      toast.error('Failed to stop sandbox')
-    } finally {
-      setIsStoppingSandbox(false)
-    }
-  }
-
-  const handleStartSandbox = async () => {
-    setIsStartingSandbox(true)
-    try {
-      const response = await fetch(`/api/tasks/${task.id}/start-sandbox`, {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        toast.success('Sandbox started successfully!')
-        // Refresh tasks to update UI
-        await refreshTasks()
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to start sandbox')
-      }
-    } catch (error) {
-      console.error('Error starting sandbox:', error)
-      toast.error('Failed to start sandbox')
-    } finally {
-      setIsStartingSandbox(false)
     }
   }
 
@@ -1722,23 +1515,6 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
               variant="ghost"
               size="sm"
               onClick={() => {
-                const newValue = !showPreviewPane
-                setShowPreviewPane(newValue)
-                saveShowPreviewPane(newValue)
-              }}
-              className={cn(
-                'h-7 px-3 text-xs font-medium transition-colors',
-                showPreviewPane
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50',
-              )}
-            >
-              Sandbox
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
                 const newValue = !showChatPane
                 setShowChatPane(newValue)
                 saveShowChatPane(newValue)
@@ -1934,202 +1710,8 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
               </div>
             )}
 
-            {/* Resize Handle - Code/Preview */}
-            {showPreviewPane && (showCodePane || showFilesPane) && (
-              <div className="w-3 cursor-col-resize flex-shrink-0 relative group">
-                <div className="absolute inset-y-0 left-1/2 -translate-x-1/2 w-px bg-border group-hover:bg-primary/50 transition-colors" />
-              </div>
-            )}
-
-            {/* Preview */}
-            {showPreviewPane && (
-              <div className={cn('flex-1 min-h-0 min-w-0', isPreviewFullscreen && 'fixed inset-0 z-50 bg-background')}>
-                <div className="overflow-hidden h-full flex flex-col">
-                  {/* Preview Toolbar */}
-                  <div className="flex items-center gap-2 px-3 border-b flex-shrink-0 h-[46px]">
-                    <Monitor className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    {task.sandboxUrl && sandboxHealth !== 'stopped' ? (
-                      <a
-                        href={task.sandboxUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-muted-foreground hover:text-foreground truncate flex-1 transition-colors"
-                        title={task.sandboxUrl}
-                      >
-                        {task.sandboxUrl}
-                      </a>
-                    ) : (
-                      <span className="text-sm text-muted-foreground truncate flex-1">
-                        {sandboxHealth === 'stopped'
-                          ? 'Sandbox stopped'
-                          : currentStatus === 'pending' || currentStatus === 'processing'
-                            ? 'Creating sandbox...'
-                            : 'Sandbox not running'}
-                      </span>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPreviewKey((prev) => prev + 1)}
-                      className="h-6 w-6 p-0 flex-shrink-0"
-                      title="Refresh Preview"
-                      disabled={!task.sandboxUrl}
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsPreviewFullscreen(!isPreviewFullscreen)}
-                      className="h-6 w-6 p-0 flex-shrink-0"
-                      title={isPreviewFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                    >
-                      {isPreviewFullscreen ? (
-                        <Minimize className="h-3.5 w-3.5" />
-                      ) : (
-                        <Maximize className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 flex-shrink-0"
-                          disabled={isRestartingDevServer || isStoppingSandbox || isStartingSandbox}
-                        >
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {task.sandboxUrl && (
-                          <>
-                            <DropdownMenuItem onClick={() => window.open(task.sandboxUrl!, '_blank')}>
-                              Open in New Tab
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                navigator.clipboard.writeText(task.sandboxUrl!)
-                              }}
-                            >
-                              Copy URL
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {task.keepAlive && (
-                          <>
-                            {task.sandboxUrl && <DropdownMenuSeparator />}
-                            {sandboxHealth === 'stopped' || !task.sandboxUrl ? (
-                              <DropdownMenuItem onClick={handleStartSandbox} disabled={isStartingSandbox}>
-                                {isStartingSandbox ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Starting...
-                                  </>
-                                ) : (
-                                  'Start Sandbox'
-                                )}
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem onClick={handleStopSandbox} disabled={isStoppingSandbox}>
-                                {isStoppingSandbox ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Stopping...
-                                  </>
-                                ) : (
-                                  'Stop Sandbox'
-                                )}
-                              </DropdownMenuItem>
-                            )}
-                          </>
-                        )}
-                        {sandboxHealth === 'running' && (
-                          <>
-                            {(task.sandboxUrl || task.keepAlive) && <DropdownMenuSeparator />}
-                            <DropdownMenuItem onClick={handleRestartDevServer} disabled={isRestartingDevServer}>
-                              {isRestartingDevServer ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  Restarting...
-                                </>
-                              ) : (
-                                'Restart Dev Server'
-                              )}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  <div className="overflow-y-auto flex-1">
-                    {task.sandboxUrl ? (
-                      <div className="relative w-full h-full">
-                        {sandboxHealth === 'running' ? (
-                          <iframe
-                            key={previewKey}
-                            src={task.sandboxUrl}
-                            className="w-full h-full border-0"
-                            title="Preview"
-                            sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-                          />
-                        ) : null}
-                        {sandboxHealth === 'starting' && (
-                          <div className="absolute inset-0 bg-background flex items-center justify-center">
-                            <div className="text-center">
-                              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                              <p className="text-sm text-muted-foreground">Starting dev server...</p>
-                            </div>
-                          </div>
-                        )}
-                        {sandboxHealth === 'stopped' && (
-                          <div className="absolute inset-0 bg-background flex items-center justify-center">
-                            <div className="text-center">
-                              <StopCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                              <p className="text-sm text-muted-foreground mb-1">Sandbox Stopped</p>
-                              <p className="text-xs text-muted-foreground">Start a new sandbox from the menu above</p>
-                            </div>
-                          </div>
-                        )}
-                        {sandboxHealth === 'error' && (
-                          <div className="absolute inset-0 bg-background flex items-center justify-center">
-                            <div className="text-center">
-                              <AlertCircle className="h-8 w-8 mx-auto mb-2 text-destructive" />
-                              <p className="text-sm text-muted-foreground mb-1">Application Error</p>
-                              <p className="text-xs text-muted-foreground">The dev server encountered an error</p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground text-sm p-6 text-center">
-                        <div>
-                          {currentStatus === 'pending' || currentStatus === 'processing' ? (
-                            <>
-                              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                              <p className="mb-1">Creating sandbox...</p>
-                              <p className="text-xs">The preview will appear here once the dev server starts</p>
-                            </>
-                          ) : (
-                            <>
-                              <p className="mb-1">Sandbox not running</p>
-                              <p className="text-xs">
-                                {task.keepAlive
-                                  ? 'Start it from the menu above to view the preview'
-                                  : 'This task does not have keep-alive enabled'}
-                              </p>
-                            </>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Resize Handle - Preview/Chat or Code/Chat */}
-            {showChatPane && (showPreviewPane || showCodePane || showFilesPane) && (
+            {/* Resize Handle - Code/Chat */}
+            {showChatPane && (showCodePane || showFilesPane) && (
               <div
                 className="w-3 cursor-col-resize flex-shrink-0 relative group"
                 onMouseDown={() => setResizingPane('chat')}
@@ -2197,205 +1779,6 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
               <div className={cn('h-full', activeTab !== 'chat' && 'hidden')}>
                 <TaskChat taskId={task.id} task={task} />
               </div>
-
-              {/* Preview Tab */}
-              <div
-                className={cn(
-                  'h-full',
-                  activeTab !== 'preview' && 'hidden',
-                  isPreviewFullscreen && 'fixed inset-0 z-50 bg-background',
-                )}
-              >
-                <div className="overflow-hidden h-full flex flex-col">
-                  {/* Preview Toolbar */}
-                  <div className="flex items-center gap-2 px-3 border-b flex-shrink-0 h-[46px]">
-                    <Monitor className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    {task.sandboxUrl ? (
-                      <a
-                        href={task.sandboxUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-muted-foreground hover:text-foreground truncate flex-1 transition-colors"
-                        title={task.sandboxUrl}
-                      >
-                        {task.sandboxUrl}
-                      </a>
-                    ) : (
-                      <span className="text-sm text-muted-foreground truncate flex-1">
-                        {currentStatus === 'pending' || currentStatus === 'processing'
-                          ? 'Creating sandbox...'
-                          : 'Sandbox not running'}
-                      </span>
-                    )}
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setPreviewKey((prev) => prev + 1)}
-                      className="h-6 w-6 p-0 flex-shrink-0"
-                      title="Refresh Preview"
-                      disabled={!task.sandboxUrl}
-                    >
-                      <RefreshCw className="h-3.5 w-3.5" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setIsPreviewFullscreen(!isPreviewFullscreen)}
-                      className="h-6 w-6 p-0 flex-shrink-0"
-                      title={isPreviewFullscreen ? 'Exit Fullscreen' : 'Fullscreen'}
-                    >
-                      {isPreviewFullscreen ? (
-                        <Minimize className="h-3.5 w-3.5" />
-                      ) : (
-                        <Maximize className="h-3.5 w-3.5" />
-                      )}
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 flex-shrink-0"
-                          disabled={isRestartingDevServer || isStoppingSandbox || isStartingSandbox}
-                        >
-                          <MoreVertical className="h-3.5 w-3.5" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        {task.sandboxUrl && (
-                          <>
-                            <DropdownMenuItem onClick={() => window.open(task.sandboxUrl!, '_blank')}>
-                              Open in New Tab
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              onClick={() => {
-                                navigator.clipboard.writeText(task.sandboxUrl!)
-                              }}
-                            >
-                              Copy URL
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                        {task.keepAlive && (
-                          <>
-                            {task.sandboxUrl && <DropdownMenuSeparator />}
-                            {task.sandboxUrl ? (
-                              <DropdownMenuItem onClick={handleStopSandbox} disabled={isStoppingSandbox}>
-                                {isStoppingSandbox ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Stopping...
-                                  </>
-                                ) : (
-                                  'Stop Sandbox'
-                                )}
-                              </DropdownMenuItem>
-                            ) : (
-                              <DropdownMenuItem onClick={handleStartSandbox} disabled={isStartingSandbox}>
-                                {isStartingSandbox ? (
-                                  <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Starting...
-                                  </>
-                                ) : (
-                                  'Start Sandbox'
-                                )}
-                              </DropdownMenuItem>
-                            )}
-                          </>
-                        )}
-                        {task.sandboxUrl && (
-                          <>
-                            {task.keepAlive && <DropdownMenuSeparator />}
-                            <DropdownMenuItem onClick={handleRestartDevServer} disabled={isRestartingDevServer}>
-                              {isRestartingDevServer ? (
-                                <>
-                                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  Restarting...
-                                </>
-                              ) : (
-                                'Restart Dev Server'
-                              )}
-                            </DropdownMenuItem>
-                          </>
-                        )}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                  {task.sandboxUrl ? (
-                    <div className="overflow-y-auto flex-1 relative">
-                      {sandboxHealth === 'running' ? (
-                        <iframe
-                          key={previewKey}
-                          src={task.sandboxUrl}
-                          className="w-full h-full border-0"
-                          title="Preview"
-                          sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals"
-                        />
-                      ) : null}
-                      {sandboxHealth === 'starting' && (
-                        <div className="absolute inset-0 bg-background flex items-center justify-center">
-                          <div className="text-center">
-                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground">Starting dev server...</p>
-                          </div>
-                        </div>
-                      )}
-                      {sandboxHealth === 'stopped' && (
-                        <div className="absolute inset-0 bg-background flex items-center justify-center">
-                          <div className="text-center">
-                            <StopCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
-                            <p className="text-sm text-muted-foreground mb-1">Sandbox Stopped</p>
-                            <p className="text-xs text-muted-foreground">Start a new sandbox from the menu above</p>
-                          </div>
-                        </div>
-                      )}
-                      {sandboxHealth === 'error' && (
-                        <div className="absolute inset-0 bg-background flex items-center justify-center">
-                          <div className="text-center">
-                            <AlertCircle className="h-8 w-8 mx-auto mb-2 text-destructive" />
-                            <p className="text-sm text-muted-foreground mb-1">Application Error</p>
-                            <p className="text-xs text-muted-foreground">The dev server encountered an error</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex items-center justify-center flex-1 text-muted-foreground text-sm p-6 text-center">
-                      <div>
-                        {currentStatus === 'pending' || currentStatus === 'processing' ? (
-                          <>
-                            <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2 text-muted-foreground" />
-                            <p className="mb-1">Creating sandbox...</p>
-                            <p className="text-xs mb-4">The preview will appear here once the dev server starts</p>
-                          </>
-                        ) : (
-                          <>
-                            <p className="mb-1">Sandbox not running</p>
-                            <p className="text-xs mb-4">
-                              {task.keepAlive
-                                ? 'Start the sandbox to view the preview'
-                                : 'This task does not have keep-alive enabled'}
-                            </p>
-                          </>
-                        )}
-                        {task.keepAlive && !task.sandboxUrl && (
-                          <Button size="sm" onClick={handleStartSandbox} disabled={isStartingSandbox} className="mt-2">
-                            {isStartingSandbox ? (
-                              <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                Starting...
-                              </>
-                            ) : (
-                              'Start Sandbox'
-                            )}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
             </div>
 
             {/* Bottom Tab Bar */}
@@ -2420,16 +1803,6 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
                 >
                   <MessageSquare className="h-5 w-5" />
                   <span className="text-xs font-medium">Chat</span>
-                </button>
-                <button
-                  onClick={() => setActiveTab('preview')}
-                  className={cn(
-                    'flex-1 flex flex-col items-center justify-center gap-1 transition-colors',
-                    activeTab === 'preview' ? 'text-primary' : 'text-muted-foreground',
-                  )}
-                >
-                  <Monitor className="h-5 w-5" />
-                  <span className="text-xs font-medium">Sandbox</span>
                 </button>
               </div>
             </div>
@@ -2461,7 +1834,7 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
                         </button>
                       </div>
 
-                      {/* Segment Button for Remote/Sandbox sub-modes */}
+                      {/* Segment Button for Remote/Workspace sub-modes */}
                       <div className="inline-flex rounded-md border border-border bg-muted/50 p-0.5">
                         <Button
                           variant={subMode === 'remote' ? 'secondary' : 'ghost'}
@@ -2485,7 +1858,7 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
                               : 'hover:bg-transparent hover:text-foreground'
                           }`}
                         >
-                          Sandbox
+                          Workspace
                         </Button>
                       </div>
                     </div>
@@ -2575,46 +1948,6 @@ export function TaskDetails({ task, maxSandboxDuration = 300 }: TaskDetailsProps
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
                     Install Dependencies?
-                  </Label>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="try-again-max-duration" className="text-sm font-medium">
-                    Maximum Duration
-                  </Label>
-                  <Select
-                    value={tryAgainMaxDuration.toString()}
-                    onValueChange={(value) => setTryAgainMaxDuration(parseInt(value))}
-                  >
-                    <SelectTrigger id="try-again-max-duration" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5 minutes</SelectItem>
-                      <SelectItem value="10">10 minutes</SelectItem>
-                      <SelectItem value="15">15 minutes</SelectItem>
-                      <SelectItem value="30">30 minutes</SelectItem>
-                      <SelectItem value="45">45 minutes</SelectItem>
-                      <SelectItem value="60">1 hour</SelectItem>
-                      <SelectItem value="120">2 hours</SelectItem>
-                      <SelectItem value="180">3 hours</SelectItem>
-                      <SelectItem value="240">4 hours</SelectItem>
-                      <SelectItem value="300">5 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="try-again-keep-alive"
-                    checked={tryAgainKeepAlive}
-                    onCheckedChange={(checked) => setTryAgainKeepAlive(!!checked)}
-                  />
-                  <Label
-                    htmlFor="try-again-keep-alive"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Keep Alive ({maxSandboxDuration} minutes max)
                   </Label>
                 </div>
 

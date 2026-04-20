@@ -166,8 +166,6 @@ export function RepoIssues({ owner, repo }: RepoIssuesProps) {
   const [selectedAgent, setSelectedAgent] = useState('claude')
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODELS.claude)
   const [installDeps, setInstallDeps] = useState(false)
-  const [maxDuration, setMaxDuration] = useState(300)
-  const [keepAlive, setKeepAlive] = useState(false)
   const [isCreatingTask, setIsCreatingTask] = useState(false)
 
   useEffect(() => {
@@ -223,8 +221,6 @@ export function RepoIssues({ owner, repo }: RepoIssuesProps) {
           selectedAgent,
           selectedModel,
           installDependencies: installDeps,
-          maxDuration,
-          keepAlive,
         }),
       })
 
@@ -416,43 +412,6 @@ export function RepoIssues({ owner, repo }: RepoIssuesProps) {
                     className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                   >
                     Install Dependencies?
-                  </Label>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="max-duration" className="text-sm font-medium">
-                    Maximum Duration
-                  </Label>
-                  <Select value={maxDuration.toString()} onValueChange={(value) => setMaxDuration(parseInt(value))}>
-                    <SelectTrigger id="max-duration" className="w-full">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="5">5 minutes</SelectItem>
-                      <SelectItem value="10">10 minutes</SelectItem>
-                      <SelectItem value="15">15 minutes</SelectItem>
-                      <SelectItem value="30">30 minutes</SelectItem>
-                      <SelectItem value="45">45 minutes</SelectItem>
-                      <SelectItem value="60">1 hour</SelectItem>
-                      <SelectItem value="120">2 hours</SelectItem>
-                      <SelectItem value="180">3 hours</SelectItem>
-                      <SelectItem value="240">4 hours</SelectItem>
-                      <SelectItem value="300">5 hours</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="keep-alive"
-                    checked={keepAlive}
-                    onCheckedChange={(checked) => setKeepAlive(!!checked)}
-                  />
-                  <Label
-                    htmlFor="keep-alive"
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                  >
-                    Keep Alive (300 minutes max)
                   </Label>
                 </div>
               </div>

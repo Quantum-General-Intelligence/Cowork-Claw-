@@ -2,8 +2,9 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { cookies } from 'next/headers'
 import { getOrCreateUser } from '@/lib/auth/get-or-create-user'
+import { persistGitHubConnection } from '@/lib/auth/github-connection'
 import { getUserPlan } from '@/lib/billing/check-subscription'
-import { isSuperAdmin } from '@/lib/auth/super-admin'
+import { isSuperAdmin, isInternalTeam } from '@/lib/auth/super-admin'
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
   if (code) {
     const cookieStore = await cookies()
     const supabase = createClient(cookieStore)
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data: exchangeData, error } = await supabase.auth.exchangeCodeForSession(code)
 
     if (!error) {
       const {
@@ -30,7 +31,28 @@ export async function GET(request: Request) {
         try {
           const dbUser = await getOrCreateUser(user)
 
-          if (isSuperAdmin(user.email) || user.email?.endsWith('@qgi.dev')) {
+          // Capture provider OAuth tokens returned by the code exchange. These are
+          // NOT persisted by Supabase, so this callback is our only window to
+          // stash them. Today we only persist GitHub tokens (the one provider
+          // whose API we call on the user's behalf), written to the accounts
+          // table so primary sign-in and linkIdentity flows behave identically.
+          const providerToken = exchangeData.session?.provider_token ?? null
+          const providerRefreshToken = exchangeData.session?.provider_refresh_token ?? null
+          const mostRecentProvider = user.app_metadata?.provider
+          if (providerToken && mostRecentProvider === 'github') {
+            try {
+              await persistGitHubConnection({
+                userId: dbUser.id,
+                providerToken,
+                providerRefreshToken,
+                supabaseUser: user,
+              })
+            } catch (connectionError) {
+              console.error('Failed to persist GitHub connection:', connectionError)
+            }
+          }
+
+          if (isSuperAdmin(user.email) || isInternalTeam(user.email)) {
             cookieStore.set('_sub_status', 'active', {
               path: '/',
               httpOnly: true,

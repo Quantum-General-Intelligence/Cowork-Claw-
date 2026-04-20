@@ -51,7 +51,12 @@ export async function POST(req: NextRequest) {
   const existing = await db
     .select()
     .from(keys)
-    .where(and(eq(keys.userId, session.user.id), eq(keys.provider, provider as 'claude-subscription' | 'gemini-subscription')))
+    .where(
+      and(
+        eq(keys.userId, session.user.id),
+        eq(keys.provider, provider as 'claude-subscription' | 'gemini-subscription'),
+      ),
+    )
     .limit(1)
 
   if (existing.length > 0) {

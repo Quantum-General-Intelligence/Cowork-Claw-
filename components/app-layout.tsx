@@ -30,7 +30,6 @@ interface TasksContextType {
     selectedAgent: string
     selectedModel: string
     installDependencies: boolean
-    maxDuration: number
   }) => { id: string; optimisticTask: Task }
 }
 
@@ -155,7 +154,7 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
 
     // Mark as mounted to enable transitions
     setHasMounted(true)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Fetch tasks on component mount
@@ -233,7 +232,6 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
     selectedAgent: string
     selectedModel: string
     installDependencies: boolean
-    maxDuration: number
   }) => {
     const id = nanoid()
     const optimisticTask: Task = {
@@ -245,17 +243,15 @@ export function AppLayout({ children, initialSidebarWidth, initialSidebarOpen, i
       selectedAgent: taskData.selectedAgent,
       selectedModel: taskData.selectedModel,
       installDependencies: taskData.installDependencies,
-      maxDuration: taskData.maxDuration,
-      keepAlive: false,
       enableBrowser: false,
       status: 'pending',
       progress: 0,
       logs: [],
       error: null,
       branchName: null,
-      sandboxId: null,
       agentSessionId: null,
-      sandboxUrl: null,
+      environmentId: null,
+      workdir: null,
       previewUrl: null,
       mcpServerIds: null,
       templateSlug: null,

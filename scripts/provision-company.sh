@@ -148,7 +148,6 @@ echo "  Code synced"
 echo "[5/10] Configuring environment..."
 
 # Generate company-specific secrets
-JWE=$(openssl rand -base64 32)
 ENC_KEY=$(openssl rand -hex 32)
 
 # Create SSH key for sandbox (self-referencing — the VPS runs its own containers)
@@ -157,25 +156,29 @@ SELF_SSH_KEY=$SANDBOX_SSH_KEY
 $SSH root@$IP "cat > $DEPLOY_DIR/.env.local << 'ENVEOF'
 # ── Cowork-Claw: ${COMPANY} instance ──
 POSTGRES_URL=postgresql://cowork:CoworkClaw-DB-2026@31.220.108.185:5432/coworkclaw
-JWE_SECRET=${JWE}
 ENCRYPTION_KEY=${ENC_KEY}
 
-# Supabase (shared)
+# Supabase (shared — handles all auth: email, Google, GitHub)
 NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
 
-# Auth
-NEXT_PUBLIC_AUTH_PROVIDERS=github
-NEXT_PUBLIC_GITHUB_CLIENT_ID=${NEXT_PUBLIC_GITHUB_CLIENT_ID:-Ov23libQfT5jdHSfSfpe}
-GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-3fd90708829824394ec8c5190eba5cdf5e90eab8}
+# Which providers to surface on /auth
+NEXT_PUBLIC_AUTH_PROVIDERS=${NEXT_PUBLIC_AUTH_PROVIDERS:-email,google,github}
 
-# Sandbox (self — runs Docker on this same VPS)
+# Optional: deep-link client ID for the "Reconfigure GitHub access" UX
+NEXT_PUBLIC_GITHUB_CLIENT_ID=${NEXT_PUBLIC_GITHUB_CLIENT_ID:-}
+
+# Company VPS control-plane SSH (self — connects back to this same box as
+# root so the app can provision/dispatch to per-user Linux accounts)
 SANDBOX_SSH_HOST=127.0.0.1
 SANDBOX_SSH_PORT=22
 SANDBOX_SSH_USER=root
 SANDBOX_SSH_KEY=${SELF_SSH_KEY}
-MAX_CONCURRENT_SANDBOXES=4
 ARTIFACT_ROOT=/var/lib/cowork-artifacts
+
+# Public base URL for the ttyd reverse proxy (Caddy snippet from
+# install-vps-clis.sh listens at /ttyd/<port>/)
+TERMINAL_PROXY_URL=https://${SUBDOMAIN}/ttyd
 
 # AI Keys (employees bring their own via /onboarding/key)
 ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
@@ -202,8 +205,8 @@ services:
       args:
         NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL}
         NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
-        NEXT_PUBLIC_AUTH_PROVIDERS: github
-        NEXT_PUBLIC_GITHUB_CLIENT_ID: ${NEXT_PUBLIC_GITHUB_CLIENT_ID:-Ov23libQfT5jdHSfSfpe}
+        NEXT_PUBLIC_AUTH_PROVIDERS: ${NEXT_PUBLIC_AUTH_PROVIDERS:-email,google,github}
+        NEXT_PUBLIC_GITHUB_CLIENT_ID: ${NEXT_PUBLIC_GITHUB_CLIENT_ID:-}
     restart: unless-stopped
     env_file: .env.local
     network_mode: host
@@ -246,15 +249,11 @@ fi
 echo "[8/10] Building Docker image (this takes 3-5 min)..."
 $SSH root@$IP "cd $DEPLOY_DIR && docker compose -f docker-compose.prod.yml build --no-cache 2>&1 | tail -3"
 
-# ── Step 9: Build runner image if missing ───────────────────────
-echo "[9/10] Checking runner image..."
-RUNNER=$($SSH root@$IP 'docker images cowork-claw/runner --format "{{.Repository}}" 2>/dev/null' | head -1)
-if [ -z "$RUNNER" ]; then
-  echo "  Building runner image..."
-  $SSH root@$IP "cd $DEPLOY_DIR && mkdir -p /tmp/cowork-runner-build && cp docker/runner/* /tmp/cowork-runner-build/ && cd /tmp/cowork-runner-build && docker build -t cowork-claw/runner:latest . 2>&1 | tail -3"
-else
-  echo "  Runner image exists"
-fi
+# ── Step 9: Install agent CLIs + ttyd on the host ───────────────
+# Persistent-user-environments model: CLIs live on the VPS, not in a runner
+# image. This bootstrap is idempotent; safe to re-run.
+echo "[9/10] Installing agent CLIs + ttyd on host..."
+$SSH root@$IP "bash -s" < "$REPO_ROOT/scripts/install-vps-clis.sh" 2>&1 | tail -10
 
 # ── Step 10: Start ──────────────────────────────────────────────
 echo "[10/10] Starting..."

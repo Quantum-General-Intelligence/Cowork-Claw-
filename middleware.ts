@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import { updateSession } from '@/utils/supabase/middleware'
-import { isSuperAdmin } from '@/lib/auth/super-admin'
+import { isSuperAdmin, isInternalTeam } from '@/lib/auth/super-admin'
 
 const PUBLIC_PREFIXES = ['/auth', '/api/auth', '/api/billing/webhook', '/api/waitlist', '/tutorial', '/onboarding']
 const AUTH_ONLY_PREFIXES = ['/settings/billing', '/api/billing']
@@ -26,7 +26,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(authUrl)
   }
 
-  if (isSuperAdmin(user.email) || user.email?.endsWith('@qgi.dev')) return response
+  if (isSuperAdmin(user.email) || isInternalTeam(user.email)) return response
 
   if (isAuthOnly(pathname)) return response
 

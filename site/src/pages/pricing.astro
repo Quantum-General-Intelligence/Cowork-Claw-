@@ -5,12 +5,12 @@ import PricingCards from '../components/PricingCards'
 const APP_URL = 'https://app.cowork-claw.ai'
 ---
 
-<Base title="Pricing - Cowork-Claw" description="Simple, transparent pricing for Cowork-Claw. Hobby, Pro, and Business plans with hosted sandbox execution and bring-your-own-key support.">
+<Base title="Pricing - Cowork-Claw" description="Simple, transparent pricing for Cowork-Claw. Hobby, Pro, and Business plans with hosted agent execution and bring-your-own-key support.">
   <section class="py-20 sm:py-28 px-4 sm:px-6">
     <div class="max-w-5xl mx-auto">
       <h1 class="text-3xl sm:text-4xl font-bold text-center mb-4">Pricing</h1>
       <p class="text-center text-muted-foreground mb-12 max-w-lg mx-auto">
-        Every plan includes hosted sandbox execution and bring-your-own-key support. No hidden fees.
+        Every plan includes hosted agent execution on your team's persistent Linux environment and bring-your-own-key support. No hidden fees.
       </p>
       <PricingCards client:load />
     </div>
@@ -25,7 +25,7 @@ const APP_URL = 'https://app.cowork-claw.ai'
           <h3 class="font-semibold mb-1">What does "bring your own key" mean?</h3>
           <p class="text-sm text-muted-foreground leading-relaxed">
             You can use your own API keys for Claude, OpenAI, Gemini, and other providers.
-            Your keys are encrypted and only used within your sandboxes. Alternatively, every plan
+            Your keys are encrypted and only used by tasks running on your team's VPS. Alternatively, every plan
             includes access using our shared API quota.
           </p>
         </div>
@@ -40,7 +40,7 @@ const APP_URL = 'https://app.cowork-claw.ai'
           <h3 class="font-semibold mb-1">How does Business pricing work?</h3>
           <p class="text-sm text-muted-foreground leading-relaxed">
             Business is $40 per user per month with a minimum of 3 users ($120/month minimum).
-            Each user gets their own task quota and sandbox allocation.
+            Each user gets their own Linux account on the company VPS, task quota, and file storage.
           </p>
         </div>
         <div>
@@ -51,10 +51,11 @@ const APP_URL = 'https://app.cowork-claw.ai'
           </p>
         </div>
         <div>
-          <h3 class="font-semibold mb-1">What sandbox execution is included?</h3>
+          <h3 class="font-semibold mb-1">What execution environment is included?</h3>
           <p class="text-sm text-muted-foreground leading-relaxed">
-            Every plan includes fully hosted Docker sandboxes where AI agents run your code.
-            Sandboxes include a file editor, terminal, and live preview — all in your browser.
+            Every plan provides each team member with a dedicated Linux account on a managed company VPS.
+            Agents run in your browser-backed workspace with a file editor, terminal, CLI logins, and
+            live preview — all state persists between tasks.
           </p>
         </div>
       </div>
@@ -66,10 +67,10 @@ const APP_URL = 'https://app.cowork-claw.ai'
     <div class="max-w-2xl mx-auto text-center">
       <h2 class="text-xl sm:text-2xl font-bold mb-4">Ready to get started?</h2>
       <a
-        href={`${APP_URL}/api/auth/signin/github`}
+        href={`${APP_URL}/auth`}
         class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90 transition-opacity"
       >
-        Sign In with GitHub
+        Sign In
       </a>
     </div>
   </section>

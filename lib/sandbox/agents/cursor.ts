@@ -1,5 +1,5 @@
 import type { SandboxInstance as Sandbox } from '../provider'
-import { runCommandInSandbox, runInProject, PROJECT_DIR } from '../commands'
+import { runCommandInSandbox, runInProject } from '../commands'
 import { AgentExecutionResult } from '../types'
 import { redactSensitiveInfo } from '@/lib/utils/logging'
 import { TaskLogger } from '@/lib/utils/task-logger'
@@ -301,9 +301,8 @@ EOF`
       await logger.info('Executing cursor-agent directly without shell wrapper')
     }
 
-    // Execute cursor-agent using the proper Vercel Sandbox API with environment variables
     if (logger) {
-      await logger.info('Executing cursor-agent with proper environment variables via Sandbox API')
+      await logger.info('Executing cursor-agent with environment variables')
     }
 
     // Capture output by intercepting the streams
@@ -466,7 +465,7 @@ EOF`
       },
       sudo: false,
       detached: true,
-      cwd: PROJECT_DIR,
+      cwd: sandbox.projectDir,
       stdout: captureStdout,
       stderr: captureStderr,
     })

@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getUserGitHubToken } from '@/lib/github/user-token'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const token = await getUserGitHubToken(req)
+    const token = await getUserGitHubToken()
 
     if (!token) {
       return NextResponse.json({ error: 'GitHub not connected' }, { status: 401 })

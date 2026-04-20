@@ -17,7 +17,7 @@ export function User(props: { user?: Session['user'] | null; authProvider?: Sess
     [initialized, session.user, props.user],
   )
   const authProvider = useMemo(
-    () => (initialized ? (session.authProvider ?? 'vercel') : (props.authProvider ?? 'vercel')),
+    () => (initialized ? (session.authProvider ?? 'email') : (props.authProvider ?? 'email')),
     [initialized, session.authProvider, props.authProvider],
   )
 

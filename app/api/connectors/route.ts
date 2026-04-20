@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { db } from '@/lib/db/client'
 import { connectors } from '@/lib/db/schema'
 import { decrypt } from '@/lib/crypto'
-import { getSessionFromReq } from '@/lib/session/server'
+import { getServerSession } from '@/lib/session/get-server-session'
 import { eq } from 'drizzle-orm'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const session = await getSessionFromReq(req)
+    const session = await getServerSession()
 
     if (!session?.user?.id) {
       return NextResponse.json(

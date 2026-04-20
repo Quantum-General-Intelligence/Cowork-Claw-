@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { after } from 'next/server'
 import { db } from '@/lib/db/client'
 import { workspaces, workspaceMembers } from '@/lib/db/schema'
 import { getServerSession } from '@/lib/session/get-server-session'
 import { eq, desc } from 'drizzle-orm'
 import { generateId } from '@/lib/utils/id'
+import { provisionUserEnvAsync } from '@/lib/company/provision-user'
 
 export async function GET() {
   try {
@@ -57,16 +59,25 @@ export async function POST(req: NextRequest) {
         slug,
         ownerId: session.user.id,
         description: body.description,
+        usePersistentEnv: Boolean(body.usePersistentEnv),
       })
       .returning()
 
-    // Add creator as owner member
     await db.insert(workspaceMembers).values({
       id: generateId(12),
       workspaceId,
       userId: session.user.id,
       role: 'owner',
     })
+
+    if (workspace?.usePersistentEnv) {
+      after(() =>
+        provisionUserEnvAsync({
+          userId: session.user.id,
+          workspaceId,
+        }),
+      )
+    }
 
     return NextResponse.json({ workspace })
   } catch (error) {

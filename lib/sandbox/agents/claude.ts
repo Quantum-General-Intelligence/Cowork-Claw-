@@ -1,6 +1,6 @@
 import type { SandboxInstance as Sandbox } from '../provider'
 import { Writable } from 'stream'
-import { runCommandInSandbox, runInProject, PROJECT_DIR } from '../commands'
+import { runCommandInSandbox, runInProject } from '../commands'
 import { AgentExecutionResult } from '../types'
 import { redactSensitiveInfo } from '@/lib/utils/logging'
 import { TaskLogger } from '@/lib/utils/task-logger'
@@ -417,7 +417,7 @@ export async function executeClaudeInSandbox(
       args: ['-c', fullCommand],
       sudo: false,
       detached: true,
-      cwd: PROJECT_DIR,
+      cwd: sandbox.projectDir,
       stdout: captureStdout,
       stderr: captureStderr,
     })

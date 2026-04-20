@@ -44,10 +44,7 @@ interface RevertCommitDialogProps {
     selectedAgent: string
     selectedModel: string
     installDependencies: boolean
-    maxDuration: number
-    keepAlive: boolean
   }) => void
-  maxSandboxDuration?: number
 }
 
 const CODING_AGENTS = [
@@ -125,20 +122,10 @@ const DEFAULT_MODELS = {
   orchestrate: 'auto',
 } as const
 
-export function RevertCommitDialog({
-  open,
-  onOpenChange,
-  commit,
-  owner,
-  repo,
-  onRevert,
-  maxSandboxDuration = 300,
-}: RevertCommitDialogProps) {
+export function RevertCommitDialog({ open, onOpenChange, commit, onRevert }: RevertCommitDialogProps) {
   const [selectedAgent, setSelectedAgent] = useState('claude')
   const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODELS.claude)
   const [installDependencies, setInstallDependencies] = useState(false)
-  const [maxDuration, setMaxDuration] = useState(300)
-  const [keepAlive, setKeepAlive] = useState(false)
   const [isReverting, setIsReverting] = useState(false)
 
   // Update model when agent changes
@@ -166,8 +153,6 @@ export function RevertCommitDialog({
       selectedAgent,
       selectedModel,
       installDependencies,
-      maxDuration,
-      keepAlive,
     })
     setIsReverting(false)
     onOpenChange(false)
@@ -240,43 +225,6 @@ export function RevertCommitDialog({
                   className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
                 >
                   Install Dependencies?
-                </Label>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="revert-max-duration" className="text-sm font-medium">
-                  Maximum Duration
-                </Label>
-                <Select value={maxDuration.toString()} onValueChange={(value) => setMaxDuration(parseInt(value))}>
-                  <SelectTrigger id="revert-max-duration" className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="5">5 minutes</SelectItem>
-                    <SelectItem value="10">10 minutes</SelectItem>
-                    <SelectItem value="15">15 minutes</SelectItem>
-                    <SelectItem value="30">30 minutes</SelectItem>
-                    <SelectItem value="45">45 minutes</SelectItem>
-                    <SelectItem value="60">1 hour</SelectItem>
-                    <SelectItem value="120">2 hours</SelectItem>
-                    <SelectItem value="180">3 hours</SelectItem>
-                    <SelectItem value="240">4 hours</SelectItem>
-                    <SelectItem value="300">5 hours</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="revert-keep-alive"
-                  checked={keepAlive}
-                  onCheckedChange={(checked) => setKeepAlive(!!checked)}
-                />
-                <Label
-                  htmlFor="revert-keep-alive"
-                  className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                >
-                  Keep Alive ({maxSandboxDuration} minutes max)
                 </Label>
               </div>
             </div>

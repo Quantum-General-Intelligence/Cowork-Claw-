@@ -3,6 +3,7 @@ export type AuthProvider = 'github' | 'vercel' | 'google' | 'email'
 export interface SessionUserInfo {
   user: User | undefined
   authProvider?: AuthProvider
+  githubConnected?: boolean
 }
 
 export interface Tokens {

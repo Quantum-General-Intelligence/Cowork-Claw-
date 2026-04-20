@@ -435,7 +435,9 @@ export function LogsPane({ task, onHeightChange }: LogsPaneProps) {
           {progressLog && (
             <div className="mt-1 border-t border-white/10 pt-1">
               <div className="text-yellow-400/60 text-[10px] mb-0.5">— live progress —</div>
-              <pre className="text-yellow-300 text-xs whitespace-pre-wrap break-all font-mono leading-tight">{progressLog}</pre>
+              <pre className="text-yellow-300 text-xs whitespace-pre-wrap break-all font-mono leading-tight">
+                {progressLog}
+              </pre>
             </div>
           )}
         </div>

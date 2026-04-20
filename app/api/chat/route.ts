@@ -8,7 +8,6 @@ import { checkRateLimit } from '@/lib/utils/rate-limit'
 import { getUserApiKeys } from '@/lib/api-keys/user-keys'
 import { getUserGitHubToken } from '@/lib/github/user-token'
 import { getGitHubUser } from '@/lib/github/client'
-import { getMaxSandboxDuration } from '@/lib/db/settings'
 
 const ORCHESTRATOR_SYSTEM_PROMPT = `You are OpenClaw, the AI orchestrator for the Cowork-Claw platform. You coordinate a team of AI coding agents to accomplish tasks for the user.
 
@@ -38,14 +37,13 @@ Keep responses focused and actionable. You are the user's AI team lead.`
 
 // Pre-fetch everything needed for task execution BEFORE the stream starts
 // This avoids losing request context inside after()
-async function prefetchTaskContext(userId: string) {
-  const [apiKeys, githubToken, githubUser, maxDuration] = await Promise.all([
+async function prefetchTaskContext() {
+  const [apiKeys, githubToken, githubUser] = await Promise.all([
     getUserApiKeys(),
     getUserGitHubToken(),
     getGitHubUser(),
-    getMaxSandboxDuration(userId),
   ])
-  return { apiKeys, githubToken, githubUser, maxDuration }
+  return { apiKeys, githubToken, githubUser }
 }
 
 export async function POST(req: NextRequest) {
@@ -111,7 +109,7 @@ export async function POST(req: NextRequest) {
   const apiKey = useGateway ? aiGatewayKey! : anthropicKey!
 
   // Pre-fetch task context while we still have request context
-  const taskContext = await prefetchTaskContext(session.user.id)
+  const taskContext = await prefetchTaskContext()
 
   // Define the create_task tool
   const tools = [
@@ -239,8 +237,6 @@ export async function POST(req: NextRequest) {
                     status: 'pending',
                     progress: 0,
                     installDependencies: false,
-                    maxDuration: taskContext.maxDuration,
-                    keepAlive: false,
                     enableBrowser: false,
                   })
 
@@ -252,10 +248,8 @@ export async function POST(req: NextRequest) {
                         taskId,
                         toolArgs.prompt,
                         toolArgs.repoUrl,
-                        taskContext.maxDuration,
                         toolArgs.selectedAgent || 'orchestrate',
                         undefined,
-                        false,
                         false,
                         false,
                         {

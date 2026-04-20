@@ -1,5 +1,5 @@
 import type { SandboxInstance as Sandbox } from '../provider'
-import { runCommandInSandbox, runInProject, PROJECT_DIR } from '../commands'
+import { runCommandInSandbox, runInProject } from '../commands'
 import { AgentExecutionResult } from '../types'
 import { redactSensitiveInfo } from '@/lib/utils/logging'
 import { TaskLogger } from '@/lib/utils/task-logger'

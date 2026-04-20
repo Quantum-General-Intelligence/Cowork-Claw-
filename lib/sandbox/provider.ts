@@ -18,62 +18,26 @@ export interface RunCommandConfig {
   [key: string]: unknown
 }
 
+/**
+ * Uniform interface for "a thing we can run commands inside".
+ *
+ * Implementations:
+ *   - `lib/env/user-env-instance.ts` (persistent user environment via SSH)
+ *   - Future providers (local Docker for development, other tenants, ...)
+ */
 export interface SandboxInstance {
-  sandboxId: string
+  /**
+   * Stable identifier for the underlying environment (per-user VPS env id).
+   */
+  environmentId: string
+  /**
+   * Absolute path to the task's working directory inside the instance.
+   * For persistent user envs this points at the per-task workdir in the
+   * user's home directory (~/projects/<owner>/<repo> or ~/tasks/<taskId>).
+   */
+  projectDir: string
   runCommand(command: string, args?: string[]): Promise<CommandResult>
   runCommand(config: RunCommandConfig): Promise<CommandResult>
   domain(port: number): string
   stop(): Promise<void>
-}
-
-export interface SandboxCreateConfig {
-  /** Legacy Vercel fields — kept optional so existing call sites still type-check during the migration. Ignored by DockerSandboxProvider. */
-  teamId?: string
-  projectId?: string
-  token?: string
-
-  /** Docker image to run. Defaults to `node:22` for backward compatibility with the classic dev-sandbox flow. Set to `cowork-claw/runner:latest` for office-cowork tasks. */
-  image?: string
-
-  /** Hard timeout (ms) after which the container is force-stopped and removed by a background cleanup timer. */
-  timeout?: number
-
-  /** Ports to publish on the host. Only relevant to classic dev-sandbox flow. Office-cowork tasks ignore this. */
-  ports?: number[]
-
-  /** Legacy runtime hint ("node22", etc.). Ignored when `image` is set. */
-  runtime?: string
-
-  /** Per-container resource caps. */
-  resources?: {
-    vcpus?: number
-    memMb?: number
-    pids?: number
-  }
-
-  /** Git source to clone into `/vercel/sandbox/project` at spawn time. Optional for office-cowork tasks. */
-  source?: {
-    type: 'git'
-    url: string
-    revision?: string
-    depth?: number
-  }
-
-  /** Environment variables to set inside the container at `docker run` time. NEVER log these. */
-  env?: Record<string, string>
-
-  /** Absolute host path to mount at `/out` inside the container. If set, the Next task route must ensure the directory exists and is writable by the SSH user before calling `create()`. */
-  artifactVolume?: string
-}
-
-export interface SandboxGetOptions {
-  sandboxId: string
-  teamId?: string
-  projectId?: string
-  token?: string
-}
-
-export interface SandboxProvider {
-  create(config: SandboxCreateConfig): Promise<SandboxInstance>
-  get(options: SandboxGetOptions): Promise<SandboxInstance>
 }

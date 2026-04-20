@@ -13,7 +13,6 @@ interface TaskPageClientProps {
   user: Session['user'] | null
   authProvider: Session['authProvider'] | null
   initialStars?: number
-  maxSandboxDuration?: number
 }
 
 function parseRepoFromUrl(repoUrl: string | null): { owner: string; repo: string } | null {
@@ -33,13 +32,7 @@ function parseRepoFromUrl(repoUrl: string | null): { owner: string; repo: string
   }
 }
 
-export function TaskPageClient({
-  taskId,
-  user,
-  authProvider,
-  initialStars = 1200,
-  maxSandboxDuration = 300,
-}: TaskPageClientProps) {
+export function TaskPageClient({ taskId, user, authProvider, initialStars = 1200 }: TaskPageClientProps) {
   const { task, isLoading, error } = useTask(taskId)
   const [logsPaneHeight, setLogsPaneHeight] = useState(40) // Default to collapsed height
 
@@ -93,7 +86,7 @@ export function TaskPageClient({
 
       {/* Task details */}
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden" style={{ paddingBottom: `${logsPaneHeight}px` }}>
-        <TaskDetails task={task} maxSandboxDuration={maxSandboxDuration} />
+        <TaskDetails task={task} />
       </div>
 
       {/* Logs pane at bottom */}

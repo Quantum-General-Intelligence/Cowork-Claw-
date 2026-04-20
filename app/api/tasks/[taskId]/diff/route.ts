@@ -4,7 +4,7 @@ import { tasks } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { getOctokit } from '@/lib/github/client'
 import { getServerSession } from '@/lib/session/get-server-session'
-import { PROJECT_DIR } from '@/lib/sandbox/commands'
+import { getEnvInstanceForTask } from '@/lib/env/resolver'
 import type { Octokit } from '@octokit/rest'
 
 function getLanguageFromFilename(filename: string): string {
@@ -172,74 +172,43 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       return NextResponse.json({ error: 'Task does not have branch or repository information' }, { status: 400 })
     }
 
-    // Handle local diff mode (git diff in sandbox)
+    // Handle local diff mode (git diff in the persistent workdir)
     if (mode === 'local') {
-      if (!task.sandboxId) {
-        return NextResponse.json({ error: 'Sandbox not available' }, { status: 400 })
+      const envResolved = await getEnvInstanceForTask(taskId, session.user.id)
+      if (!envResolved) {
+        return NextResponse.json({ error: 'Task environment is not ready' }, { status: 400 })
       }
 
       try {
-        const { getSandbox } = await import('@/lib/sandbox/sandbox-registry')
-        const { getSandboxProvider } = await import('@/lib/sandbox/factory')
-
-        let sandbox = getSandbox(taskId)
-
-        // Try to reconnect if not in registry
-        if (!sandbox) {
-          const sandboxToken = process.env.SANDBOX_VERCEL_TOKEN
-          const teamId = process.env.SANDBOX_VERCEL_TEAM_ID
-          const projectId = process.env.SANDBOX_VERCEL_PROJECT_ID
-
-          if (sandboxToken && teamId && projectId) {
-            sandbox = await getSandboxProvider().get({
-              sandboxId: task.sandboxId,
-              teamId,
-              projectId,
-              token: sandboxToken,
-            })
-          }
-        }
-
-        if (!sandbox) {
-          return NextResponse.json({ error: 'Sandbox not found or inactive' }, { status: 400 })
-        }
-
-        // Fetch latest from remote to ensure we have up-to-date remote refs
-        const fetchResult = await sandbox.runCommand({
+        await envResolved.instance.runCommand({
           cmd: 'git',
           args: ['fetch', 'origin', task.branchName],
-          cwd: PROJECT_DIR,
+          cwd: envResolved.workdir,
         })
 
-        // Check if remote branch actually exists (even if fetch succeeds, the branch might not exist)
         const remoteBranchRef = `origin/${task.branchName}`
-        const checkRemoteResult = await sandbox.runCommand({
+        const checkRemoteResult = await envResolved.instance.runCommand({
           cmd: 'git',
           args: ['rev-parse', '--verify', remoteBranchRef],
-          cwd: PROJECT_DIR,
+          cwd: envResolved.workdir,
         })
         const remoteBranchExists = checkRemoteResult.exitCode === 0
 
         if (!remoteBranchExists) {
-          // Remote branch doesn't exist yet, compare against HEAD (local changes only)
-
-          // Get old content (HEAD version)
-          const oldContentResult = await sandbox.runCommand({
+          const oldContentResult = await envResolved.instance.runCommand({
             cmd: 'git',
             args: ['show', `HEAD:${filename}`],
-            cwd: PROJECT_DIR,
+            cwd: envResolved.workdir,
           })
           let oldContent = ''
           if (oldContentResult.exitCode === 0) {
             oldContent = await oldContentResult.stdout()
           }
-          // File might not exist in HEAD (new file)
 
-          // Get new content (working directory version)
-          const newContentResult = await sandbox.runCommand({
+          const newContentResult = await envResolved.instance.runCommand({
             cmd: 'cat',
             args: [filename],
-            cwd: PROJECT_DIR,
+            cwd: envResolved.workdir,
           })
           const newContent = newContentResult.exitCode === 0 ? await newContentResult.stdout() : ''
 
@@ -256,39 +225,31 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           })
         }
 
-        // Compare working directory against remote branch
-        // This shows all uncommitted AND unpushed changes
-        const diffResult = await sandbox.runCommand({
+        const diffResult = await envResolved.instance.runCommand({
           cmd: 'git',
           args: ['diff', remoteBranchRef, filename],
-          cwd: PROJECT_DIR,
+          cwd: envResolved.workdir,
         })
-
         if (diffResult.exitCode !== 0) {
           const diffError = await diffResult.stderr()
           console.error('Failed to get local diff:', diffError)
           return NextResponse.json({ error: 'Failed to get local diff' }, { status: 500 })
         }
 
-        const diffOutput = await diffResult.stdout()
-
-        // Get old content (remote branch version)
-        const oldContentResult = await sandbox.runCommand({
+        const oldContentResult = await envResolved.instance.runCommand({
           cmd: 'git',
           args: ['show', `${remoteBranchRef}:${filename}`],
-          cwd: PROJECT_DIR,
+          cwd: envResolved.workdir,
         })
         let oldContent = ''
         if (oldContentResult.exitCode === 0) {
           oldContent = await oldContentResult.stdout()
         }
-        // File might not exist on remote (new file)
 
-        // Get new content (working directory version)
-        const newContentResult = await sandbox.runCommand({
+        const newContentResult = await envResolved.instance.runCommand({
           cmd: 'cat',
           args: [filename],
-          cwd: PROJECT_DIR,
+          cwd: envResolved.workdir,
         })
         const newContent = newContentResult.exitCode === 0 ? await newContentResult.stdout() : ''
 
@@ -305,12 +266,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         })
       } catch (error) {
         console.error('Error getting local diff:', error)
-
-        // Check if it's a 410 error (sandbox not running)
-        if (error && typeof error === 'object' && 'status' in error && error.status === 410) {
-          return NextResponse.json({ error: 'Sandbox is not running' }, { status: 410 })
-        }
-
         return NextResponse.json({ error: 'Failed to get local diff' }, { status: 500 })
       }
     }

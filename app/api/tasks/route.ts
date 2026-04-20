@@ -13,7 +13,6 @@ import { getGitHubUser } from '@/lib/github/client'
 import { getUserApiKeys } from '@/lib/api-keys/user-keys'
 import { checkRateLimit } from '@/lib/utils/rate-limit'
 import { getUserPlan } from '@/lib/billing/check-subscription'
-import { getMaxSandboxDuration } from '@/lib/db/settings'
 
 export async function GET() {
   try {
@@ -77,12 +76,7 @@ export async function POST(request: NextRequest) {
     const todayTasks = await db
       .select({ count: sql<number>`count(*)` })
       .from(tasks)
-      .where(
-        and(
-          eq(tasks.userId, userId),
-          sql`DATE(${tasks.createdAt}) = ${today}`
-        )
-      )
+      .where(and(eq(tasks.userId, userId), sql`DATE(${tasks.createdAt}) = ${today}`))
     const todayCount = todayTasks[0]?.count ?? 0
 
     if (todayCount >= userPlan.dailyApiCalls) {
@@ -191,7 +185,6 @@ export async function POST(request: NextRequest) {
     const userApiKeys = await getUserApiKeys()
     const userGithubToken = await getUserGitHubToken()
     const githubUser = await getGitHubUser()
-    const maxSandboxDuration = await getMaxSandboxDuration(session.user.id)
 
     // Process task asynchronously
     after(async () => {
@@ -200,11 +193,9 @@ export async function POST(request: NextRequest) {
           newTask.id,
           validatedData.prompt,
           validatedData.repoUrl || '',
-          validatedData.maxDuration || maxSandboxDuration,
           validatedData.selectedAgent || 'claude',
           validatedData.selectedModel,
           validatedData.installDependencies || false,
-          validatedData.keepAlive || false,
           validatedData.enableBrowser || false,
           { apiKeys: userApiKeys, githubToken: userGithubToken, githubUser },
         )

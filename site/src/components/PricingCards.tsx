@@ -110,7 +110,7 @@ export default function PricingCards() {
               ))}
             </ul>
             <a
-              href={`${APP_URL}/api/auth/signin/github?next=/subscribe?plan=${plan.id}`}
+              href={`${APP_URL}/auth?next=${encodeURIComponent(`/subscribe?plan=${plan.id}`)}`}
               className={`w-full inline-flex items-center justify-center rounded-md px-4 py-2.5 text-sm font-medium transition-opacity hover:opacity-90 ${
                 plan.highlighted
                   ? 'bg-primary text-primary-foreground shadow-sm'

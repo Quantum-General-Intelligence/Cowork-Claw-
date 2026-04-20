@@ -24,14 +24,32 @@ function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) 
     >
       {copied ? (
         <>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <polyline points="20 6 9 17 4 12" />
           </svg>
           Copied!
         </>
       ) : (
         <>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
             <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
           </svg>
@@ -45,7 +63,17 @@ function CopyButton({ text, label = 'Copy' }: { text: string; label?: string }) 
 function CheckCircle() {
   return (
     <div className="flex h-12 w-12 items-center justify-center rounded-full bg-green-500/10 mx-auto">
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500">
+      <svg
+        width="24"
+        height="24"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="text-green-500"
+      >
         <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
         <polyline points="22 4 12 14.01 9 11.01" />
       </svg>
@@ -81,12 +109,16 @@ export default function OnboardingKeyPage() {
   useEffect(() => {
     fetch('/api/api-keys/check?agent=claude')
       .then((r) => r.json())
-      .then((data) => { if (data.hasKey) setHasCompanyKey(true) })
+      .then((data) => {
+        if (data.hasKey) setHasCompanyKey(true)
+      })
       .catch(() => {})
     // Get current auth provider from session info
     fetch('/api/auth/info')
       .then((r) => r.json())
-      .then((data) => { if (data.provider) setAuthProvider(data.provider) })
+      .then((data) => {
+        if (data.authProvider) setAuthProvider(data.authProvider)
+      })
       .catch(() => {})
   }, [])
 
@@ -174,11 +206,20 @@ export default function OnboardingKeyPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background">
       <div className="mx-auto w-full max-w-md space-y-6 p-6">
-
         {/* Header */}
         <div className="space-y-2 text-center">
           <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-primary">
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="text-primary"
+            >
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
           </div>
@@ -193,7 +234,9 @@ export default function OnboardingKeyPage() {
             {mode === 'choose' && 'Choose how to power your AI agents. You can change this anytime in settings.'}
             {mode === 'byo' && 'Your key is encrypted and never logged.'}
             {mode === 'subscription' && !subProvider && 'Select your active subscription.'}
-            {mode === 'subscription' && subProvider === 'claude' && 'One-time setup — we store your credentials securely.'}
+            {mode === 'subscription' &&
+              subProvider === 'claude' &&
+              'One-time setup — we store your credentials securely.'}
             {mode === 'subscription' && subProvider === 'gemini' && 'Connect your Google AI access.'}
           </p>
         </div>
@@ -208,7 +251,16 @@ export default function OnboardingKeyPage() {
               >
                 <div className="flex items-start gap-3">
                   <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <svg
+                      width="16"
+                      height="16"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
                       <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
                       <circle cx="9" cy="7" r="4" />
                       <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
@@ -231,7 +283,16 @@ export default function OnboardingKeyPage() {
             >
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <path d="m21 2-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0 3 3L22 7l-3-3m-3.5 3.5L19 4" />
                   </svg>
                 </div>
@@ -251,8 +312,10 @@ export default function OnboardingKeyPage() {
               <div className="flex items-start gap-3">
                 <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 7h-9" /><path d="M14 17H5" />
-                    <circle cx="17" cy="17" r="3" /><circle cx="7" cy="7" r="3" />
+                    <path d="M20 7h-9" />
+                    <path d="M14 17H5" />
+                    <circle cx="17" cy="17" r="3" />
+                    <circle cx="7" cy="7" r="3" />
                   </svg>
                 </div>
                 <div>
@@ -293,11 +356,7 @@ export default function OnboardingKeyPage() {
                   onChange={(e) => setApiKey(e.target.value)}
                   disabled={status === 'validating'}
                 />
-                <Button
-                  className="w-full"
-                  onClick={validate}
-                  disabled={apiKey.length < 10 || status === 'validating'}
-                >
+                <Button className="w-full" onClick={validate} disabled={apiKey.length < 10 || status === 'validating'}>
                   {status === 'validating' ? 'Validating…' : 'Validate & Save'}
                 </Button>
                 {error && <p className="text-sm text-red-500">{error}</p>}
@@ -432,7 +491,17 @@ export default function OnboardingKeyPage() {
               /* User signed in with Google — they're already connected */
               <div className="space-y-4">
                 <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4 flex items-start gap-3">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-green-500 mt-0.5 shrink-0">
+                  <svg
+                    width="18"
+                    height="18"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-green-500 mt-0.5 shrink-0"
+                  >
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                     <polyline points="22 4 12 14.01 9 11.01" />
                   </svg>

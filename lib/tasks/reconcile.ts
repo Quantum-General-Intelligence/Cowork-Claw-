@@ -1,49 +1,32 @@
 import { db } from '@/lib/db/client'
 import { tasks } from '@/lib/db/schema'
-import { eq } from 'drizzle-orm'
-import { getSandboxProvider } from '@/lib/sandbox/factory'
+import { and, eq } from 'drizzle-orm'
+
+const STALE_PROCESSING_MS = 60 * 60 * 1000 // 1h
 
 /**
- * On app startup, find any tasks stuck in 'processing' status and check
- * if their sandbox containers are still running. If not, mark them as failed.
+ * Mark long-running `processing` tasks as failed on app boot.
  *
- * Called once from a server-side module on app boot.
+ * In the persistent-env model there are no sandbox containers to health-check,
+ * so we simply assume that any task stuck in `processing` longer than
+ * `STALE_PROCESSING_MS` is the result of a crash or restart and flip it to
+ * `error`. The workdir inside the user's home dir stays intact.
  */
 export async function reconcileStaleTasks(): Promise<void> {
   try {
-    const staleTasks = await db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.status, 'processing'))
+    const cutoff = new Date(Date.now() - STALE_PROCESSING_MS)
+    const staleTasks = await db.select().from(tasks).where(eq(tasks.status, 'processing'))
 
     if (staleTasks.length === 0) return
 
-    const provider = getSandboxProvider()
     let reconciled = 0
-
     for (const task of staleTasks) {
-      if (!task.sandboxId) {
-        // No sandbox ID — task never started, mark as error
-        await db
-          .update(tasks)
-          .set({ status: 'error', updatedAt: new Date() })
-          .where(eq(tasks.id, task.id))
-        reconciled++
-        continue
-      }
-
-      try {
-        // Check if sandbox is still running
-        await provider.get({ sandboxId: task.sandboxId })
-        // Still running — leave it alone
-      } catch {
-        // Sandbox is gone — mark task as error
-        await db
-          .update(tasks)
-          .set({ status: 'error', updatedAt: new Date() })
-          .where(eq(tasks.id, task.id))
-        reconciled++
-      }
+      if (task.updatedAt > cutoff) continue
+      await db
+        .update(tasks)
+        .set({ status: 'error', updatedAt: new Date() })
+        .where(and(eq(tasks.id, task.id), eq(tasks.status, 'processing')))
+      reconciled++
     }
 
     if (reconciled > 0) {

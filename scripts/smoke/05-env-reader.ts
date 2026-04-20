@@ -17,7 +17,6 @@ const env = getEnv()
 assert(env.POSTGRES_URL.startsWith('postgres://'), 'POSTGRES_URL read')
 assert(env.SANDBOX_SSH_PORT === 22, 'SANDBOX_SSH_PORT defaults to 22')
 assert(env.SANDBOX_SSH_USER === 'root', 'SANDBOX_SSH_USER defaults to root')
-assert(env.MAX_CONCURRENT_SANDBOXES === 8, 'MAX_CONCURRENT_SANDBOXES defaults to 8')
 assert(env.ARTIFACT_ROOT === '/var/lib/cowork-artifacts', 'ARTIFACT_ROOT default')
 
 console.log('PASS scripts/smoke/05-env-reader.ts')

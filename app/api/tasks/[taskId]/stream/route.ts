@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server'
 import { db } from '@/lib/db/client'
-import { tasks } from '@/lib/db/schema'
+import { tasks, userEnvironments } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { getSandboxProvider } from '@/lib/sandbox/factory'
+import { execAsUser } from '@/lib/company/vps-client'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +29,6 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
       while (attempts < MAX_ATTEMPTS) {
         attempts++
         try {
-          // Check task status
           const [task] = await db.select().from(tasks).where(eq(tasks.id, taskId)).limit(1)
           if (!task) {
             send('error', 'Task not found')
@@ -41,21 +40,32 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
             break
           }
 
-          // Try to read progress log from sandbox
-          if (task.sandboxId) {
+          // Prefer persistent-env path: cat progress.log inside the user's workdir.
+          if (task.environmentId && task.workdir) {
             try {
-              const provider = getSandboxProvider()
-              const sandbox = await provider.get({ sandboxId: task.sandboxId })
-              const result = await sandbox.runCommand('cat', ['/out/progress.log'])
-              const content = await result.stdout()
-
-              if (content.length > lastLength) {
-                const newContent = content.substring(lastLength)
-                send('progress', newContent)
-                lastLength = content.length
+              const [env] = await db
+                .select()
+                .from(userEnvironments)
+                .where(eq(userEnvironments.id, task.environmentId))
+                .limit(1)
+              if (env) {
+                const progressPath = `${task.workdir}/.out/progress.log`
+                const result = await execAsUser(
+                  env.linuxUsername,
+                  `cat '${progressPath.replace(/'/g, "'\\''")}' 2>/dev/null || true`,
+                  { timeoutMs: 10000, maxRetries: 1 },
+                )
+                if (result.exitCode === 0) {
+                  const content = result.stdout
+                  if (content.length > lastLength) {
+                    const newContent = content.substring(lastLength)
+                    send('progress', newContent)
+                    lastLength = content.length
+                  }
+                }
               }
             } catch {
-              // Sandbox may not be ready yet or may have exited
+              // env may not be ready; keep polling
             }
           }
         } catch {

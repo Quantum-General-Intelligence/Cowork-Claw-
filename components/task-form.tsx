@@ -17,7 +17,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { Loader2, ArrowUp, Settings, X, Cable, Users, Globe } from 'lucide-react'
 import { Claude, Codex, Copilot, Cursor, Gemini, OpenCode, OpenClaw, Pi } from '@/components/logos'
-import { setInstallDependencies, setMaxDuration, setKeepAlive, setEnableBrowser } from '@/lib/utils/cookies'
+import { setInstallDependencies, setEnableBrowser } from '@/lib/utils/cookies'
 import { useConnectors } from '@/components/connectors-provider'
 import { ConnectorDialog } from '@/components/connectors/manage-connectors'
 import { TemplateStrip } from '@/components/template-strip'
@@ -46,18 +46,13 @@ interface TaskFormProps {
     selectedModel: string
     selectedModels?: string[]
     installDependencies: boolean
-    maxDuration: number
-    keepAlive: boolean
     enableBrowser: boolean
   }) => void
   isSubmitting: boolean
   selectedOwner: string
   selectedRepo: string
   initialInstallDependencies?: boolean
-  initialMaxDuration?: number
-  initialKeepAlive?: boolean
   initialEnableBrowser?: boolean
-  maxSandboxDuration?: number
 }
 
 const CODING_AGENTS = [
@@ -187,10 +182,7 @@ export function TaskForm({
   selectedOwner,
   selectedRepo,
   initialInstallDependencies = false,
-  initialMaxDuration = 300,
-  initialKeepAlive = false,
   initialEnableBrowser = false,
-  maxSandboxDuration = 300,
 }: TaskFormProps) {
   const [prompt, setPrompt] = useAtom(taskPromptAtom)
   const [savedAgent, setSavedAgent] = useAtom(lastSelectedAgentAtom)
@@ -202,8 +194,6 @@ export function TaskForm({
 
   // Options state - initialize with server values
   const [installDependencies, setInstallDependenciesState] = useState(initialInstallDependencies)
-  const [maxDuration, setMaxDurationState] = useState(initialMaxDuration)
-  const [keepAlive, setKeepAliveState] = useState(initialKeepAlive)
   const [enableBrowser, setEnableBrowserState] = useState(initialEnableBrowser)
   const [showMcpServersDialog, setShowMcpServersDialog] = useState(false)
   const [selectedTemplateSlug, setSelectedTemplateSlug] = useState<string | null>(null)
@@ -218,16 +208,6 @@ export function TaskForm({
   const updateInstallDependencies = (value: boolean) => {
     setInstallDependenciesState(value)
     setInstallDependencies(value)
-  }
-
-  const updateMaxDuration = (value: number) => {
-    setMaxDurationState(value)
-    setMaxDuration(value)
-  }
-
-  const updateKeepAlive = (value: boolean) => {
-    setKeepAliveState(value)
-    setKeepAlive(value)
   }
 
   const updateEnableBrowser = (value: boolean) => {
@@ -370,8 +350,6 @@ export function TaskForm({
         selectedModel,
         selectedModels: selectedAgent === 'multi-agent' ? selectedModels : undefined,
         installDependencies,
-        maxDuration,
-        keepAlive,
         enableBrowser,
       })
       return
@@ -415,8 +393,6 @@ export function TaskForm({
       selectedModel,
       selectedModels: selectedAgent === 'multi-agent' ? selectedModels : undefined,
       installDependencies,
-      maxDuration,
-      keepAlive,
       enableBrowser,
     })
   }
@@ -424,26 +400,9 @@ export function TaskForm({
   return (
     <div className="w-full max-w-2xl">
       <div className="text-center mb-8">
-        <h1 className="text-4xl font-bold mb-4">Coding Agent Template</h1>
+        <h1 className="text-4xl font-bold mb-4">Coding Agent Platform</h1>
         <p className="text-lg text-muted-foreground mb-2">
-          Multi-agent AI coding platform powered by{' '}
-          <a
-            href="https://vercel.com/docs/sandbox"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:no-underline"
-          >
-            Vercel Sandbox
-          </a>{' '}
-          and{' '}
-          <a
-            href="https://vercel.com/docs/ai-gateway"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="underline hover:no-underline"
-          >
-            AI Gateway
-          </a>
+          Multi-agent AI coding platform running on your team&apos;s persistent Linux environment.
         </p>
       </div>
 
@@ -594,56 +553,22 @@ export function TaskForm({
                 )}
 
                 {/* Option Chips - Only visible on desktop */}
-                {(!installDependencies || maxDuration !== maxSandboxDuration || keepAlive) && (
+                {!installDependencies && (
                   <div className="hidden sm:flex items-center gap-2 flex-wrap">
-                    {!installDependencies && (
-                      <Badge variant="secondary" className="text-xs h-6 px-2 gap-1 bg-transparent border-0">
-                        Skip Install
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-3 w-3 p-0 hover:bg-transparent"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            updateInstallDependencies(true)
-                          }}
-                        >
-                          <X className="h-2 w-2" />
-                        </Button>
-                      </Badge>
-                    )}
-                    {maxDuration !== maxSandboxDuration && (
-                      <Badge variant="secondary" className="text-xs h-6 px-2 gap-1 bg-transparent border-0">
-                        {maxDuration}m
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-3 w-3 p-0 hover:bg-transparent"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            updateMaxDuration(maxSandboxDuration)
-                          }}
-                        >
-                          <X className="h-2 w-2" />
-                        </Button>
-                      </Badge>
-                    )}
-                    {keepAlive && (
-                      <Badge variant="secondary" className="text-xs h-6 px-2 gap-1 bg-transparent border-0">
-                        Keep Alive
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-3 w-3 p-0 hover:bg-transparent"
-                          onClick={(e) => {
-                            e.stopPropagation()
-                            updateKeepAlive(false)
-                          }}
-                        >
-                          <X className="h-2 w-2" />
-                        </Button>
-                      </Badge>
-                    )}
+                    <Badge variant="secondary" className="text-xs h-6 px-2 gap-1 bg-transparent border-0">
+                      Skip Install
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-3 w-3 p-0 hover:bg-transparent"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          updateInstallDependencies(true)
+                        }}
+                      >
+                        <X className="h-2 w-2" />
+                      </Button>
+                    </Badge>
                   </div>
                 )}
               </div>
@@ -709,21 +634,14 @@ export function TaskForm({
                               className="rounded-full h-8 w-8 p-0 relative"
                             >
                               <Settings className="h-4 w-4" />
-                              {(() => {
-                                const customOptionsCount = [
-                                  !installDependencies,
-                                  maxDuration !== maxSandboxDuration,
-                                  keepAlive,
-                                ].filter(Boolean).length
-                                return customOptionsCount > 0 ? (
-                                  <Badge
-                                    variant="secondary"
-                                    className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[10px] rounded-full sm:hidden"
-                                  >
-                                    {customOptionsCount}
-                                  </Badge>
-                                ) : null
-                              })()}
+                              {!installDependencies && (
+                                <Badge
+                                  variant="secondary"
+                                  className="absolute -top-1 -right-1 h-4 min-w-4 p-0 flex items-center justify-center text-[10px] rounded-full sm:hidden"
+                                >
+                                  1
+                                </Badge>
+                              )}
                             </Button>
                           </DropdownMenuTrigger>
                         </TooltipTrigger>
@@ -747,47 +665,6 @@ export function TaskForm({
                             >
                               Install Dependencies?
                             </Label>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="max-duration" className="text-sm font-medium">
-                              Maximum Duration
-                            </Label>
-                            <Select
-                              value={maxDuration.toString()}
-                              onValueChange={(value) => updateMaxDuration(parseInt(value))}
-                            >
-                              <SelectTrigger id="max-duration" className="w-full h-8">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="5">5 minutes</SelectItem>
-                                <SelectItem value="10">10 minutes</SelectItem>
-                                <SelectItem value="15">15 minutes</SelectItem>
-                                <SelectItem value="30">30 minutes</SelectItem>
-                                <SelectItem value="45">45 minutes</SelectItem>
-                                <SelectItem value="60">1 hour</SelectItem>
-                                <SelectItem value="120">2 hours</SelectItem>
-                                <SelectItem value="180">3 hours</SelectItem>
-                                <SelectItem value="240">4 hours</SelectItem>
-                                <SelectItem value="300">5 hours</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="keep-alive"
-                                checked={keepAlive}
-                                onCheckedChange={(checked) => updateKeepAlive(checked === true)}
-                              />
-                              <Label
-                                htmlFor="keep-alive"
-                                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                              >
-                                Keep Alive ({maxSandboxDuration}m max)
-                              </Label>
-                            </div>
-                            <p className="text-xs text-muted-foreground pl-6">Keep sandbox running after completion.</p>
                           </div>
                         </div>
                       </DropdownMenuContent>

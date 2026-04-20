@@ -1,45 +1,10 @@
-import type { SandboxInstance as Sandbox } from './provider'
 import { LogEntry } from '@/lib/db/schema'
 
-export interface SandboxConfig {
-  taskId: string
-  repoUrl: string
-  githubToken?: string | null
-  gitAuthorName?: string
-  gitAuthorEmail?: string
-  apiKeys?: {
-    OPENAI_API_KEY?: string
-    GEMINI_API_KEY?: string
-    CURSOR_API_KEY?: string
-    ANTHROPIC_API_KEY?: string
-    AI_GATEWAY_API_KEY?: string
-  }
-  timeout?: string
-  ports?: number[]
-  runtime?: string
-  resources?: {
-    vcpus?: number
-  }
-  taskPrompt?: string
-  selectedAgent?: string
-  selectedModel?: string
-  installDependencies?: boolean
-  keepAlive?: boolean
-  enableBrowser?: boolean
-  preDeterminedBranchName?: string
-  onProgress?: (progress: number, message: string) => Promise<void>
-  onCancellationCheck?: () => Promise<boolean>
-}
-
-export interface SandboxResult {
-  success: boolean
-  sandbox?: Sandbox
-  domain?: string
-  branchName?: string
-  error?: string
-  cancelled?: boolean
-}
-
+/**
+ * Result of running a single agent invocation (Claude, Codex, etc.) inside a
+ * user environment. Shared between the ephemeral `executeAgentInSandbox` and
+ * the persistent-env `runAgentInEnv` wrappers.
+ */
 export interface AgentExecutionResult {
   success: boolean
   output?: string

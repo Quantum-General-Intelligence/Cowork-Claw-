@@ -100,7 +100,6 @@ export function FileBrowser({
   const [state, setState] = useAtom(taskStateAtom)
   const [isSyncing, setIsSyncing] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
-  const [isStartingSandbox, setIsStartingSandbox] = useState(false)
 
   // Clipboard state for cut/copy/paste
   const [clipboardFile, setClipboardFile] = useState<{ filename: string; operation: 'cut' | 'copy' } | null>(null)
@@ -264,10 +263,7 @@ export function FileBrowser({
           }
         }
       } else {
-        // Check if the error is due to sandbox not running (410 Gone)
-        const isSandboxNotRunning =
-          response.status === 410 || result.error?.includes('Sandbox is not running') || result.error?.includes('410')
-        const errorMessage = isSandboxNotRunning ? 'SANDBOX_NOT_RUNNING' : result.error || 'Failed to fetch files'
+        const errorMessage = result.error || 'Failed to fetch files'
 
         setState({
           [viewMode]: {
@@ -422,46 +418,6 @@ export function FileBrowser({
       setIsResetting(false)
     }
   }, [isResetting, branchName, taskId, commitMessage, viewMode, currentViewData, setState])
-
-  const handleStartSandbox = useCallback(async () => {
-    setIsStartingSandbox(true)
-    try {
-      const response = await fetch(`/api/tasks/${taskId}/start-sandbox`, {
-        method: 'POST',
-      })
-
-      if (response.ok) {
-        toast.success('Sandbox started! Loading files...')
-
-        // Clear the error state immediately
-        setState({
-          [viewMode]: {
-            files: [],
-            fileTree: {},
-            expandedFolders: new Set<string>(),
-            fetchAttempted: false,
-            error: null,
-          },
-          loading: true,
-        })
-
-        // Wait for sandbox to be ready and useTask to poll the updated task data
-        // useTask polls every 5 seconds, so wait ~6 seconds to ensure we have latest data
-        await new Promise((resolve) => setTimeout(resolve, 6000))
-
-        // Now fetch the files with the updated task data
-        await fetchBranchFiles()
-      } else {
-        const error = await response.json()
-        toast.error(error.error || 'Failed to start sandbox')
-      }
-    } catch (error) {
-      console.error('Error starting sandbox:', error)
-      toast.error('Failed to start sandbox')
-    } finally {
-      setIsStartingSandbox(false)
-    }
-  }, [taskId, viewMode, setState, fetchBranchFiles])
 
   const handleCreateFile = useCallback(async () => {
     if (!newFileName.trim()) {
@@ -1010,7 +966,7 @@ export function FileBrowser({
   // Keyboard shortcut handler for copy/cut/paste
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Only handle shortcuts in sandbox mode
+      // Only handle shortcuts in workspace (local) mode
       if (viewMode !== 'local' && viewMode !== 'all-local') return
 
       // Don't handle shortcuts if user is typing in an input/textarea
@@ -1370,7 +1326,7 @@ export function FileBrowser({
               </button>
             </div>
 
-            {/* Segment Button for Remote/Sandbox sub-modes */}
+            {/* Segment Button for Remote/Workspace sub-modes */}
             <div className="inline-flex rounded-md border border-border bg-muted/50 p-0.5">
               <Button
                 variant={subMode === 'remote' ? 'secondary' : 'ghost'}
@@ -1394,7 +1350,7 @@ export function FileBrowser({
                     : 'hover:bg-transparent hover:text-foreground'
                 }`}
               >
-                Sandbox
+                Workspace
               </Button>
             </div>
           </div>
@@ -1406,32 +1362,14 @@ export function FileBrowser({
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : error ? (
-          error === 'SANDBOX_NOT_RUNNING' ? (
-            <div className="h-full flex items-center justify-center">
-              <div className="flex flex-col items-center gap-3">
-                <div className="text-sm text-muted-foreground">Sandbox is not running</div>
-                <Button size="sm" onClick={handleStartSandbox} disabled={isStartingSandbox}>
-                  {isStartingSandbox ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 mr-2 animate-spin" />
-                      Starting...
-                    </>
-                  ) : (
-                    'Start Sandbox'
-                  )}
-                </Button>
-              </div>
-            </div>
-          ) : (
-            <div className="h-full flex items-center justify-center">
-              <div className="text-xs md:text-sm text-destructive">{error}</div>
-            </div>
-          )
+          <div className="h-full flex items-center justify-center">
+            <div className="text-xs md:text-sm text-destructive">{error}</div>
+          </div>
         ) : files.length === 0 ? (
           <div className="h-full flex items-center justify-center">
             <div className="text-xs md:text-sm text-muted-foreground">
               {viewMode === 'local'
-                ? 'No changes in sandbox'
+                ? 'No changes in workspace'
                 : viewMode === 'remote'
                   ? 'No changes in PR'
                   : 'No files found'}
@@ -1626,7 +1564,8 @@ export function FileBrowser({
           <AlertDialogHeader>
             <AlertDialogTitle>Reset Changes?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will reset all local changes in the sandbox to match the remote branch. This action cannot be undone.
+              This will reset all local changes in your workspace to match the remote branch. This action cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

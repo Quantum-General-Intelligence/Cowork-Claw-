@@ -8,7 +8,6 @@ import { processTaskWithTimeout } from '@/lib/tasks/executor'
 import { getUserApiKeys } from '@/lib/api-keys/user-keys'
 import { getUserGitHubToken } from '@/lib/github/user-token'
 import { getGitHubUser } from '@/lib/github/client'
-import { getMaxSandboxDuration } from '@/lib/db/settings'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -49,7 +48,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const apiKeys = await getUserApiKeys()
     const githubToken = await getUserGitHubToken()
     const githubUser = await getGitHubUser()
-    const maxDuration = await getMaxSandboxDuration(session.user.id)
 
     // Execute workflow nodes sequentially in background
     after(async () => {
@@ -63,10 +61,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             execution.id,
             node.data.prompt || '',
             repoUrl,
-            maxDuration,
             node.data.agent,
             undefined,
-            false,
             false,
             false,
             { apiKeys, githubToken, githubUser },

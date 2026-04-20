@@ -1,6 +1,6 @@
 import { db } from '@/lib/db/client'
 import { users } from '@/lib/db/schema'
-import { eq, and } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import { nanoid } from 'nanoid'
 import type { User as SupabaseUser } from '@supabase/supabase-js'
 import type { AuthProvider } from '@/lib/session/types'
@@ -18,15 +18,22 @@ export function mapSupabaseProvider(provider?: string): AuthProvider {
   }
 }
 
+/**
+ * Find or create the DB user row for this Supabase auth user.
+ *
+ * Lookup is by `externalId` (the Supabase auth UUID) which is stable across
+ * identity links/unlinks, so re-auth and linkIdentity flows always resolve
+ * to the same DB row without flipping the primary `provider`.
+ *
+ * Provider OAuth tokens are intentionally NOT written here. Tokens for
+ * providers whose API we call on the user's behalf (GitHub today) are
+ * persisted separately in `accounts` by the auth callback.
+ */
 export async function getOrCreateUser(supabaseUser: SupabaseUser) {
   const provider = mapSupabaseProvider(supabaseUser.app_metadata.provider)
   const externalId = supabaseUser.id
 
-  const [existing] = await db
-    .select()
-    .from(users)
-    .where(and(eq(users.provider, provider), eq(users.externalId, externalId)))
-    .limit(1)
+  const [existing] = await db.select().from(users).where(eq(users.externalId, externalId)).limit(1)
 
   if (existing) {
     await db

@@ -1,5 +1,5 @@
 import type { SandboxInstance as Sandbox } from '../provider'
-import { runCommandInSandbox, runInProject, PROJECT_DIR } from '../commands'
+import { runCommandInSandbox, runInProject } from '../commands'
 import { AgentExecutionResult } from '../types'
 import { redactSensitiveInfo } from '@/lib/utils/logging'
 import { TaskLogger } from '@/lib/utils/task-logger'
@@ -138,7 +138,7 @@ export async function executeCodexInSandbox(
         HOME: '/home/vercel-sandbox',
       },
       sudo: false,
-      cwd: PROJECT_DIR,
+      cwd: sandbox.projectDir,
     })
 
     if (logger) {
@@ -243,7 +243,7 @@ url = "${server.baseUrl}"
       args: ['-c', `mkdir -p ~/.codex && cat > ~/.codex/config.toml << 'EOF'\n${configToml}EOF`],
       env: {},
       sudo: false,
-      cwd: PROJECT_DIR,
+      cwd: sandbox.projectDir,
     })
 
     if (logger) {
@@ -256,7 +256,7 @@ url = "${server.baseUrl}"
       args: ['-f', '~/.codex/config.toml'],
       env: { HOME: '/home/vercel-sandbox' },
       sudo: false,
-      cwd: PROJECT_DIR,
+      cwd: sandbox.projectDir,
     })
 
     if (logger && configCheckResult.exitCode === 0) {

@@ -176,23 +176,23 @@ When making changes that involve logging:
 ### Environment Variables
 
 Never expose these in logs or to the client:
-- `SANDBOX_VERCEL_TOKEN` - Vercel API token
-- `SANDBOX_VERCEL_TEAM_ID` - Vercel team identifier
-- `SANDBOX_VERCEL_PROJECT_ID` - Vercel project identifier
+- `SANDBOX_SSH_KEY` - SSH private key for the runner host
 - `ANTHROPIC_API_KEY` - Anthropic/Claude API key
 - `OPENAI_API_KEY` - OpenAI API key
 - `GEMINI_API_KEY` - Google Gemini API key
 - `CURSOR_API_KEY` - Cursor API key
 - `GH_TOKEN` / `GITHUB_TOKEN` - GitHub personal access token
-- `JWE_SECRET` - Encryption secret
 - `ENCRYPTION_KEY` - Encryption key
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - treat the server-side service role key (if ever introduced) as secret
 - Any user-provided API keys
 
 ### Client-Safe Variables
 
 Only these variables should be exposed to the client (via `NEXT_PUBLIC_` prefix):
 - `NEXT_PUBLIC_AUTH_PROVIDERS` - Available auth providers
-- `NEXT_PUBLIC_GITHUB_CLIENT_ID` - GitHub OAuth client ID (public)
+- `NEXT_PUBLIC_GITHUB_CLIENT_ID` - GitHub OAuth client ID (optional, public)
+- `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL (public)
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` - Supabase publishable/anon key (public)
 
 ## Architecture Guidelines
 

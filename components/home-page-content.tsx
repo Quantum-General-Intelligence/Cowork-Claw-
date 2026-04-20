@@ -19,9 +19,9 @@ import {
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu'
 import { MoreHorizontal, RefreshCw, Unlink, Settings, Plus, ExternalLink } from 'lucide-react'
-import { redirectToSignIn } from '@/lib/session/redirect-to-sign-in'
 import { GitHubIcon } from '@/components/icons/github-icon'
 import { getEnabledAuthProviders } from '@/lib/auth/providers'
+import { createClient } from '@/utils/supabase/client'
 import { useSetAtom, useAtom, useAtomValue } from 'jotai'
 import { taskPromptAtom } from '@/lib/atoms/task'
 import { HomePageMobileFooter } from '@/components/home-page-mobile-footer'
@@ -35,10 +35,7 @@ interface HomePageContentProps {
   initialSelectedOwner?: string
   initialSelectedRepo?: string
   initialInstallDependencies?: boolean
-  initialMaxDuration?: number
-  initialKeepAlive?: boolean
   initialEnableBrowser?: boolean
-  maxSandboxDuration?: number
   user?: Session['user'] | null
   initialStars?: number
 }
@@ -47,10 +44,7 @@ export function HomePageContent({
   initialSelectedOwner = '',
   initialSelectedRepo = '',
   initialInstallDependencies = false,
-  initialMaxDuration = 300,
-  initialKeepAlive = false,
   initialEnableBrowser = false,
-  maxSandboxDuration = 300,
   user = null,
   initialStars = 1200,
 }: HomePageContentProps) {
@@ -58,7 +52,6 @@ export function HomePageContent({
   const [selectedOwner, setSelectedOwnerState] = useState(initialSelectedOwner)
   const [selectedRepo, setSelectedRepoState] = useState(initialSelectedRepo)
   const [showSignInDialog, setShowSignInDialog] = useState(false)
-  const [loadingVercel, setLoadingVercel] = useState(false)
   const [loadingGitHub, setLoadingGitHub] = useState(false)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [showOpenRepoDialog, setShowOpenRepoDialog] = useState(false)
@@ -80,7 +73,7 @@ export function HomePageContent({
   const isGitHubAuthUser = session.authProvider === 'github'
 
   // Check which auth providers are enabled
-  const { github: hasGitHub, vercel: hasVercel } = getEnabledAuthProviders()
+  const { github: hasGitHub } = getEnabledAuthProviders()
 
   // Show toast if GitHub was connected (user was already logged in)
   useEffect(() => {
@@ -204,8 +197,30 @@ export function HomePageContent({
     router.push(url)
   }
 
-  const handleConnectGitHub = () => {
-    window.location.href = '/api/auth/github/signin'
+  const handleConnectGitHub = async () => {
+    try {
+      const supabase = createClient()
+      const { data, error } = await supabase.auth.linkIdentity({
+        provider: 'github',
+        options: {
+          scopes: 'repo read:user user:email',
+          redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(
+            `${window.location.pathname}${window.location.search}`,
+          )}`,
+        },
+      })
+      if (error) {
+        console.error('Failed to start GitHub link:', error)
+        toast.error('Failed to connect GitHub')
+        return
+      }
+      if (data?.url) {
+        window.location.href = data.url
+      }
+    } catch (error) {
+      console.error('Failed to connect GitHub:', error)
+      toast.error('Failed to connect GitHub')
+    }
   }
 
   const handleReconfigureGitHub = () => {
@@ -213,7 +228,7 @@ export function HomePageContent({
     if (clientId) {
       window.open(`https://github.com/settings/connections/applications/${clientId}`, '_blank')
     } else {
-      window.location.href = '/api/auth/github/signin'
+      handleConnectGitHub()
     }
   }
 
@@ -232,8 +247,6 @@ export function HomePageContent({
         selectedAgent: localStorage.getItem('last-selected-agent') || 'claude',
         selectedModel: localStorage.getItem('last-selected-model-claude') || 'claude-sonnet-4-5',
         installDependencies: true,
-        maxDuration: 300,
-        keepAlive: false,
       }
 
       const { id } = addTaskOptimistically(taskData)
@@ -333,8 +346,6 @@ export function HomePageContent({
     selectedModel: string
     selectedModels?: string[]
     installDependencies: boolean
-    maxDuration: number
-    keepAlive: boolean
     enableBrowser: boolean
   }) => {
     // Check if user is authenticated
@@ -377,7 +388,6 @@ export function HomePageContent({
           selectedAgent: data.selectedAgent,
           selectedModel: data.selectedModel,
           installDependencies: data.installDependencies,
-          maxDuration: data.maxDuration,
         })
         taskIds.push(id)
         return {
@@ -387,8 +397,6 @@ export function HomePageContent({
           selectedAgent: data.selectedAgent,
           selectedModel: data.selectedModel,
           installDependencies: data.installDependencies,
-          maxDuration: data.maxDuration,
-          keepAlive: data.keepAlive,
           enableBrowser: data.enableBrowser,
         }
       })
@@ -451,7 +459,6 @@ export function HomePageContent({
           selectedAgent: agent,
           selectedModel: model,
           installDependencies: data.installDependencies,
-          maxDuration: data.maxDuration,
         })
         taskIds.push(id)
         return {
@@ -461,8 +468,6 @@ export function HomePageContent({
           selectedAgent: agent,
           selectedModel: model,
           installDependencies: data.installDependencies,
-          maxDuration: data.maxDuration,
-          keepAlive: data.keepAlive,
           enableBrowser: data.enableBrowser,
         }
       })
@@ -542,11 +547,6 @@ export function HomePageContent({
     }
   }
 
-  const handleVercelSignIn = async () => {
-    setLoadingVercel(true)
-    await redirectToSignIn()
-  }
-
   const handleGitHubSignIn = () => {
     setLoadingGitHub(true)
     window.location.href = '/auth'
@@ -565,10 +565,7 @@ export function HomePageContent({
           selectedOwner={selectedOwner}
           selectedRepo={selectedRepo}
           initialInstallDependencies={initialInstallDependencies}
-          initialMaxDuration={initialMaxDuration}
-          initialKeepAlive={initialKeepAlive}
           initialEnableBrowser={initialEnableBrowser}
-          maxSandboxDuration={maxSandboxDuration}
         />
       </div>
 
@@ -584,99 +581,50 @@ export function HomePageContent({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Sign in to continue</DialogTitle>
-            <DialogDescription>
-              {hasGitHub && hasVercel
-                ? 'You need to sign in to create tasks. Choose how you want to sign in.'
-                : hasVercel
-                  ? 'You need to sign in with Vercel to create tasks.'
-                  : 'You need to sign in with GitHub to create tasks.'}
-            </DialogDescription>
+            <DialogDescription>You need to sign in to create tasks.</DialogDescription>
           </DialogHeader>
 
           <div className="flex flex-col gap-3 py-4">
-            {hasVercel && (
-              <Button
-                onClick={handleVercelSignIn}
-                disabled={loadingVercel || loadingGitHub}
-                variant="outline"
-                size="lg"
-                className="w-full"
-              >
-                {loadingVercel ? (
-                  <>
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <svg viewBox="0 0 76 65" className="h-3 w-3 mr-2" fill="currentColor">
-                      <path d="M37.5274 0L75.0548 65H0L37.5274 0Z" />
-                    </svg>
-                    Sign in with Vercel
-                  </>
-                )}
-              </Button>
-            )}
-
-            {hasGitHub && (
-              <Button
-                onClick={handleGitHubSignIn}
-                disabled={loadingVercel || loadingGitHub}
-                variant="outline"
-                size="lg"
-                className="w-full"
-              >
-                {loadingGitHub ? (
-                  <>
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      ></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      ></path>
-                    </svg>
-                    Loading...
-                  </>
-                ) : (
-                  <>
-                    <GitHubIcon className="h-4 w-4 mr-2" />
-                    Sign in with GitHub
-                  </>
-                )}
-              </Button>
-            )}
+            <Button
+              onClick={handleGitHubSignIn}
+              disabled={loadingGitHub}
+              variant="outline"
+              size="lg"
+              className="w-full"
+            >
+              {loadingGitHub ? (
+                <>
+                  <svg
+                    className="animate-spin -ml-1 mr-2 h-4 w-4"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    ></circle>
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                    ></path>
+                  </svg>
+                  Loading...
+                </>
+              ) : hasGitHub ? (
+                <>
+                  <GitHubIcon className="h-4 w-4 mr-2" />
+                  Continue to sign in
+                </>
+              ) : (
+                <>Continue to sign in</>
+              )}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

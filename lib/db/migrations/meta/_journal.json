@@ -155,6 +155,20 @@
       "when": 1769207400000,
       "tag": "0021_lovely_lizard",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1776648739281,
+      "tag": "0022_exotic_slyde",
+      "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1776649500000,
+      "tag": "0023_phase_e_cleanup",
+      "breakpoints": true
     }
   ]
 }

@@ -1,16 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from '@/lib/session/get-server-session'
-import { eq } from 'drizzle-orm'
-import { db } from '@/lib/db/client'
-import { tasks } from '@/lib/db/schema'
-import { getSandbox } from '@/lib/sandbox/sandbox-registry'
+import { getEnvInstanceForTask } from '@/lib/env/resolver'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
 /**
  * POST /api/tasks/[taskId]/lsp
- * Handles LSP requests by executing TypeScript language service queries in the sandbox
+ * Handles LSP requests by running a TypeScript language-service helper script
+ * inside the user's persistent environment.
  */
 export async function POST(request: NextRequest, { params }: { params: Promise<{ taskId: string }> }) {
   try {
@@ -21,53 +19,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const { taskId } = await params
 
-    // Verify task belongs to user
-    const task = await db
-      .select()
-      .from(tasks)
-      .where(eq(tasks.id, taskId))
-      .limit(1)
-      .then((rows) => rows[0])
-
-    if (!task || task.userId !== session.user.id) {
-      return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+    const envResolved = await getEnvInstanceForTask(taskId, session.user.id)
+    if (!envResolved) {
+      return NextResponse.json({ error: 'Task environment is not ready' }, { status: 400 })
     }
 
-    // Check if task has a sandbox
-    if (!task.sandboxId) {
-      return NextResponse.json({ error: 'Task does not have an active sandbox' }, { status: 400 })
-    }
-
-    // Try to get sandbox from registry first (keyed by taskId, not sandboxId)
-    let sandbox = getSandbox(taskId)
-
-    // If not in registry, try to reconnect using sandboxId from database
-    if (!sandbox) {
-      try {
-        const sandboxToken = process.env.SANDBOX_VERCEL_TOKEN
-        const teamId = process.env.SANDBOX_VERCEL_TEAM_ID
-        const projectId = process.env.SANDBOX_VERCEL_PROJECT_ID
-
-        if (!sandboxToken || !teamId || !projectId) {
-          return NextResponse.json({ error: 'Sandbox credentials not configured' }, { status: 500 })
-        }
-
-        const { getSandboxProvider } = await import('@/lib/sandbox/factory')
-        sandbox = await getSandboxProvider().get({
-          sandboxId: task.sandboxId,
-          teamId,
-          projectId,
-          token: sandboxToken,
-        })
-      } catch (error) {
-        console.error('Failed to reconnect to sandbox:', error)
-        return NextResponse.json({ error: 'Failed to connect to sandbox' }, { status: 500 })
-      }
-    }
-
-    if (!sandbox) {
-      return NextResponse.json({ error: 'Sandbox not available' }, { status: 400 })
-    }
+    const sandbox = envResolved.instance
+    const workdir = envResolved.workdir
 
     const body = await request.json()
     const { method, filename, position, textDocument } = body
@@ -176,12 +134,11 @@ if (definitions && definitions.length > 0) {
 }
 `
 
-        // Write helper script to sandbox
+        // Write helper script to the project workdir
         const writeCommand = `cat > '${scriptPath}' << 'EOF'\n${helperScript}\nEOF`
-        await sandbox.runCommand('sh', ['-c', writeCommand])
+        await sandbox.runCommand({ cmd: 'sh', args: ['-c', writeCommand], cwd: workdir })
 
-        // Execute the script
-        const result = await sandbox.runCommand('node', [scriptPath])
+        const result = await sandbox.runCommand({ cmd: 'node', args: [scriptPath], cwd: workdir })
 
         // Read stdout and stderr
         let stdout = ''
@@ -197,8 +154,7 @@ if (definitions && definitions.length > 0) {
           console.error('Failed to read LSP stderr:', e)
         }
 
-        // Clean up
-        await sandbox.runCommand('rm', [scriptPath])
+        await sandbox.runCommand({ cmd: 'rm', args: [scriptPath], cwd: workdir })
 
         // Parse the result
         if (result.exitCode !== 0) {

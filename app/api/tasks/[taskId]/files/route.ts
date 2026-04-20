@@ -4,7 +4,7 @@ import { tasks } from '@/lib/db/schema'
 import { eq, and, isNull } from 'drizzle-orm'
 import { getOctokit } from '@/lib/github/client'
 import { getServerSession } from '@/lib/session/get-server-session'
-import { PROJECT_DIR } from '@/lib/sandbox/commands'
+import { getEnvInstanceForTask } from '@/lib/env/resolver'
 
 interface FileChange {
   filename: string
@@ -98,57 +98,24 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     let files: FileChange[] = []
 
-    // If mode is 'local', fetch changed files from the sandbox
+    // If mode is 'local', fetch changed files from the persistent workdir
     if (mode === 'local') {
-      if (!task.sandboxId) {
-        const response = NextResponse.json(
-          {
-            success: false,
-            error: 'Sandbox is not running',
-          },
-          { status: 410 },
-        )
+      const envResolved = await getEnvInstanceForTask(taskId, session.user.id)
+      if (!envResolved) {
+        const response = NextResponse.json({ success: false, error: 'Task environment is not ready' }, { status: 400 })
         response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
         return response
       }
 
       try {
-        const { getSandbox } = await import('@/lib/sandbox/sandbox-registry')
-        const { getSandboxProvider } = await import('@/lib/sandbox/factory')
-
-        let sandbox = getSandbox(taskId)
-
-        // Try to reconnect if not in registry
-        if (!sandbox) {
-          const sandboxToken = process.env.SANDBOX_VERCEL_TOKEN
-          const teamId = process.env.SANDBOX_VERCEL_TEAM_ID
-          const projectId = process.env.SANDBOX_VERCEL_PROJECT_ID
-
-          if (sandboxToken && teamId && projectId) {
-            sandbox = await getSandboxProvider().get({
-              sandboxId: task.sandboxId,
-              teamId,
-              projectId,
-              token: sandboxToken,
-            })
-          }
-        }
-
-        if (!sandbox) {
-          return NextResponse.json({
-            success: true,
-            files: [],
-            fileTree: {},
-            branchName: task.branchName,
-            message: 'Sandbox not found',
-          })
-        }
+        const sandbox = envResolved.instance
+        const workdir = envResolved.workdir
 
         // Run git status to get local changes
         const statusResult = await sandbox.runCommand({
           cmd: 'git',
           args: ['status', '--porcelain'],
-          cwd: PROJECT_DIR,
+          cwd: workdir,
         })
 
         if (statusResult.exitCode !== 0) {
@@ -167,26 +134,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           .split('\n')
           .filter((line) => line.trim())
 
-        // First, check if remote branch exists to determine comparison base
-        const lsRemoteResult = await sandbox.runCommand({
-          cmd: 'git',
-          args: ['ls-remote', '--heads', 'origin', task.branchName],
-          cwd: PROJECT_DIR,
-        })
         const remoteBranchRef = `origin/${task.branchName}`
         const checkRemoteResult = await sandbox.runCommand({
           cmd: 'git',
           args: ['rev-parse', '--verify', remoteBranchRef],
-          cwd: PROJECT_DIR,
+          cwd: workdir,
         })
         const remoteBranchExists = checkRemoteResult.exitCode === 0
         const compareRef = remoteBranchExists ? remoteBranchRef : 'HEAD'
 
-        // Get diff stats using git diff --numstat
         const numstatResult = await sandbox.runCommand({
           cmd: 'git',
           args: ['diff', '--numstat', compareRef],
-          cwd: PROJECT_DIR,
+          cwd: workdir,
         })
         const diffStats: Record<string, { additions: number; deletions: number }> = {}
 
@@ -253,7 +213,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               const wcResult = await sandbox.runCommand({
                 cmd: 'wc',
                 args: ['-l', filename],
-                cwd: PROJECT_DIR,
+                cwd: workdir,
               })
               if (wcResult.exitCode === 0) {
                 const wcOutput = await wcResult.stdout()
@@ -276,103 +236,21 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         files = await Promise.all(filePromises)
       } catch (error) {
-        console.error('Error fetching local changes from sandbox:', error)
-
-        // Check if it's a 410 error (sandbox not running)
-        const is410Error =
-          (error && typeof error === 'object' && 'status' in error && error.status === 410) ||
-          (error &&
-            typeof error === 'object' &&
-            'response' in error &&
-            typeof error.response === 'object' &&
-            error.response !== null &&
-            'status' in error.response &&
-            (error.response as { status: number }).status === 410)
-
-        if (is410Error) {
-          // Clear sandbox info from database since it's no longer running
-          try {
-            await db
-              .update(tasks)
-              .set({
-                sandboxId: null,
-                sandboxUrl: null,
-              })
-              .where(eq(tasks.id, taskId))
-
-            // Also remove from registry
-            const { unregisterSandbox } = await import('@/lib/sandbox/sandbox-registry')
-            unregisterSandbox(taskId)
-          } catch (dbError) {
-            console.error('Error clearing sandbox info:', dbError)
-          }
-
-          const response = NextResponse.json(
-            {
-              success: false,
-              error: 'Sandbox is not running',
-            },
-            { status: 410 },
-          )
-          response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
-          return response
-        }
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Failed to fetch local changes',
-          },
-          { status: 500 },
-        )
+        console.error('Error fetching local changes from environment:', error)
+        return NextResponse.json({ success: false, error: 'Failed to fetch local changes' }, { status: 500 })
       }
     } else if (mode === 'all-local') {
-      // Get all files from local sandbox using find command
-      if (!task.sandboxId) {
-        const response = NextResponse.json(
-          {
-            success: false,
-            error: 'Sandbox is not running',
-          },
-          { status: 410 },
-        )
+      const envResolved = await getEnvInstanceForTask(taskId, session.user.id)
+      if (!envResolved) {
+        const response = NextResponse.json({ success: false, error: 'Task environment is not ready' }, { status: 400 })
         response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
         return response
       }
 
       try {
-        const { getSandbox } = await import('@/lib/sandbox/sandbox-registry')
-        const { getSandboxProvider } = await import('@/lib/sandbox/factory')
+        const sandbox = envResolved.instance
+        const workdir = envResolved.workdir
 
-        let sandbox = getSandbox(taskId)
-
-        // Try to reconnect if not in registry
-        if (!sandbox) {
-          const sandboxToken = process.env.SANDBOX_VERCEL_TOKEN
-          const teamId = process.env.SANDBOX_VERCEL_TEAM_ID
-          const projectId = process.env.SANDBOX_VERCEL_PROJECT_ID
-
-          if (sandboxToken && teamId && projectId) {
-            sandbox = await getSandboxProvider().get({
-              sandboxId: task.sandboxId,
-              teamId,
-              projectId,
-              token: sandboxToken,
-            })
-          }
-        }
-
-        if (!sandbox) {
-          return NextResponse.json({
-            success: true,
-            files: [],
-            fileTree: {},
-            branchName: task.branchName,
-            message: 'Sandbox not found',
-          })
-        }
-
-        // Use find to list all files in the sandbox, excluding .git directory and common build directories
         const findResult = await sandbox.runCommand({
           cmd: 'find',
           args: [
@@ -398,7 +276,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
             '-path',
             '*/.vercel/*',
           ],
-          cwd: PROJECT_DIR,
+          cwd: workdir,
         })
 
         if (findResult.exitCode !== 0) {
@@ -423,7 +301,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
         const statusResult = await sandbox.runCommand({
           cmd: 'git',
           args: ['status', '--porcelain'],
-          cwd: PROJECT_DIR,
+          cwd: workdir,
         })
         const changedFilesMap: Record<string, 'added' | 'modified' | 'deleted' | 'renamed'> = {}
 
@@ -469,9 +347,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
         files = fileLines.map((filename) => {
           const trimmedFilename = filename.trim()
-          // Use the actual status from git if available, otherwise 'renamed' (which won't trigger coloring)
           const status = changedFilesMap[trimmedFilename] || ('renamed' as const)
-
           return {
             filename: trimmedFilename,
             status,
@@ -481,55 +357,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
           }
         })
       } catch (error) {
-        console.error('Error fetching local files from sandbox:', error)
-
-        // Check if it's a 410 error (sandbox not running)
-        const is410Error =
-          (error && typeof error === 'object' && 'status' in error && error.status === 410) ||
-          (error &&
-            typeof error === 'object' &&
-            'response' in error &&
-            typeof error.response === 'object' &&
-            error.response !== null &&
-            'status' in error.response &&
-            (error.response as { status: number }).status === 410)
-
-        if (is410Error) {
-          // Clear sandbox info from database since it's no longer running
-          try {
-            await db
-              .update(tasks)
-              .set({
-                sandboxId: null,
-                sandboxUrl: null,
-              })
-              .where(eq(tasks.id, taskId))
-
-            // Also remove from registry
-            const { unregisterSandbox } = await import('@/lib/sandbox/sandbox-registry')
-            unregisterSandbox(taskId)
-          } catch (dbError) {
-            console.error('Error clearing sandbox info:', dbError)
-          }
-
-          const response = NextResponse.json(
-            {
-              success: false,
-              error: 'Sandbox is not running',
-            },
-            { status: 410 },
-          )
-          response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate')
-          return response
-        }
-
-        return NextResponse.json(
-          {
-            success: false,
-            error: 'Failed to fetch local files',
-          },
-          { status: 500 },
-        )
+        console.error('Error fetching local files from environment:', error)
+        return NextResponse.json({ success: false, error: 'Failed to fetch local files' }, { status: 500 })
       }
     } else if (mode === 'all') {
       try {

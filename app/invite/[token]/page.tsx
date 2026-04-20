@@ -3,7 +3,9 @@ import { workspaceInvites, workspaceMembers, workspaces } from '@/lib/db/schema'
 import { getServerSession } from '@/lib/session/get-server-session'
 import { eq, and, isNull } from 'drizzle-orm'
 import { redirect } from 'next/navigation'
+import { after } from 'next/server'
 import { generateId } from '@/lib/utils/id'
+import { provisionUserEnvAsync } from '@/lib/company/provision-user'
 import { Metadata } from 'next'
 
 export const metadata: Metadata = {
@@ -51,7 +53,6 @@ export default async function AcceptInvitePage({ params }: PageProps) {
     )
   }
 
-  // Accept invite — add member and mark accepted
   await db.insert(workspaceMembers).values({
     id: generateId(12),
     workspaceId: invite.workspaceId,
@@ -61,8 +62,20 @@ export default async function AcceptInvitePage({ params }: PageProps) {
 
   await db.update(workspaceInvites).set({ acceptedAt: new Date() }).where(eq(workspaceInvites.id, invite.id))
 
-  // Get workspace for redirect
   const [workspace] = await db.select().from(workspaces).where(eq(workspaces.id, invite.workspaceId)).limit(1)
+
+  // Kick off Linux-user provisioning on the VPS in the background. If the
+  // workspace uses persistent envs we redirect the user to an onboarding
+  // progress page that polls /api/environments/me; otherwise straight home.
+  if (workspace?.usePersistentEnv) {
+    after(() =>
+      provisionUserEnvAsync({
+        userId: session.user.id,
+        workspaceId: invite.workspaceId,
+      }),
+    )
+    redirect(`/onboarding/environment?workspace=${workspace.id}`)
+  }
 
   redirect(`/?workspace=${workspace?.id || ''}`)
 }

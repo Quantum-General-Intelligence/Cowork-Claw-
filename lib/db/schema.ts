@@ -84,8 +84,6 @@ export const tasks = pgTable('tasks', {
   selectedAgent: text('selected_agent').default('claude'),
   selectedModel: text('selected_model'),
   installDependencies: boolean('install_dependencies').default(false),
-  maxDuration: integer('max_duration').default(parseInt(process.env.MAX_SANDBOX_DURATION || '300', 10)),
-  keepAlive: boolean('keep_alive').default(false),
   enableBrowser: boolean('enable_browser').default(false),
   status: text('status', {
     enum: ['pending', 'processing', 'completed', 'error', 'stopped'],
@@ -96,9 +94,11 @@ export const tasks = pgTable('tasks', {
   logs: jsonb('logs').$type<LogEntry[]>(),
   error: text('error'),
   branchName: text('branch_name'),
-  sandboxId: text('sandbox_id'),
   agentSessionId: text('agent_session_id'),
-  sandboxUrl: text('sandbox_url'),
+  // Persistent env identifiers set by the task executor; nullable so legacy or
+  // non-coding tasks that don't run in an env still type-check.
+  environmentId: text('environment_id'),
+  workdir: text('workdir'),
   templateSlug: text('template_slug'),
   previewUrl: text('preview_url'),
   prUrl: text('pr_url'),
@@ -126,17 +126,15 @@ export const insertTaskSchema = z.object({
     .default('claude'),
   selectedModel: z.string().optional(),
   installDependencies: z.boolean().default(false),
-  maxDuration: z.number().default(parseInt(process.env.MAX_SANDBOX_DURATION || '300', 10)),
-  keepAlive: z.boolean().default(false),
   enableBrowser: z.boolean().default(false),
   status: z.enum(['pending', 'processing', 'completed', 'error', 'stopped']).default('pending'),
   progress: z.number().min(0).max(100).default(0),
   logs: z.array(logEntrySchema).optional(),
   error: z.string().optional(),
   branchName: z.string().optional(),
-  sandboxId: z.string().optional(),
   agentSessionId: z.string().optional(),
-  sandboxUrl: z.string().optional(),
+  environmentId: z.string().optional(),
+  workdir: z.string().optional(),
   previewUrl: z.string().optional(),
   prUrl: z.string().optional(),
   prNumber: z.number().optional(),
@@ -159,17 +157,15 @@ export const selectTaskSchema = z.object({
   selectedAgent: z.string().nullable(),
   selectedModel: z.string().nullable(),
   installDependencies: z.boolean().nullable(),
-  maxDuration: z.number().nullable(),
-  keepAlive: z.boolean().nullable(),
   enableBrowser: z.boolean().nullable(),
   status: z.enum(['pending', 'processing', 'completed', 'error', 'stopped']),
   progress: z.number().nullable(),
   logs: z.array(logEntrySchema).nullable(),
   error: z.string().nullable(),
   branchName: z.string().nullable(),
-  sandboxId: z.string().nullable(),
   agentSessionId: z.string().nullable(),
-  sandboxUrl: z.string().nullable(),
+  environmentId: z.string().nullable(),
+  workdir: z.string().nullable(),
   previewUrl: z.string().nullable(),
   prUrl: z.string().nullable(),
   prNumber: z.number().nullable(),
@@ -345,7 +341,15 @@ export const keys = pgTable(
 export const insertKeySchema = z.object({
   id: z.string().optional(),
   userId: z.string(),
-  provider: z.enum(['anthropic', 'openai', 'cursor', 'gemini', 'aigateway', 'claude-subscription', 'gemini-subscription']),
+  provider: z.enum([
+    'anthropic',
+    'openai',
+    'cursor',
+    'gemini',
+    'aigateway',
+    'claude-subscription',
+    'gemini-subscription',
+  ]),
   value: z.string().min(1, 'API key value is required'),
   createdAt: z.date().optional(),
   updatedAt: z.date().optional(),
@@ -354,7 +358,15 @@ export const insertKeySchema = z.object({
 export const selectKeySchema = z.object({
   id: z.string(),
   userId: z.string(),
-  provider: z.enum(['anthropic', 'openai', 'cursor', 'gemini', 'aigateway', 'claude-subscription', 'gemini-subscription']),
+  provider: z.enum([
+    'anthropic',
+    'openai',
+    'cursor',
+    'gemini',
+    'aigateway',
+    'claude-subscription',
+    'gemini-subscription',
+  ]),
   value: z.string(),
   createdAt: z.date(),
   updatedAt: z.date(),
@@ -517,6 +529,9 @@ export const workspaces = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     description: text('description'),
+    // Phase B feature flag: run tasks in persistent per-user Linux envs on the company VPS
+    // instead of ephemeral Docker sandboxes. Defaults false for backwards compatibility.
+    usePersistentEnv: boolean('use_persistent_env').default(true).notNull(),
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at').defaultNow().notNull(),
   },
@@ -668,6 +683,107 @@ export const workflowTemplates = pgTable('workflow_templates', {
 })
 
 export type WorkflowTemplate = typeof workflowTemplates.$inferSelect
+
+// User environments — one persistent Linux account per team member on the company VPS
+// Created on invite-accept / workspace-creation. Lives for the lifetime of membership.
+export const userEnvironments = pgTable(
+  'user_environments',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    workspaceId: text('workspace_id')
+      .notNull()
+      .references(() => workspaces.id, { onDelete: 'cascade' }),
+    linuxUsername: text('linux_username').notNull(),
+    homeDir: text('home_dir').notNull(),
+    status: text('status', {
+      enum: ['pending', 'provisioning', 'ready', 'error', 'deprovisioned'],
+    })
+      .notNull()
+      .default('pending'),
+    errorMessage: text('error_message'),
+    provisionedAt: timestamp('provisioned_at'),
+    lastActiveAt: timestamp('last_active_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('user_environments_user_workspace_idx').on(table.userId, table.workspaceId),
+    uniqueIndex('user_environments_linux_username_idx').on(table.linuxUsername),
+  ],
+)
+
+export type UserEnvironment = typeof userEnvironments.$inferSelect
+export type InsertUserEnvironment = typeof userEnvironments.$inferInsert
+
+// Per-environment CLI install + auth status
+// Installation is system-wide on the VPS; this row tracks whether *this user*
+// has authenticated the CLI (e.g. logged into Claude Max) in their home directory.
+export const userEnvClis = pgTable(
+  'user_env_clis',
+  {
+    id: text('id').primaryKey(),
+    environmentId: text('environment_id')
+      .notNull()
+      .references(() => userEnvironments.id, { onDelete: 'cascade' }),
+    cli: text('cli', {
+      enum: ['claude', 'codex', 'cursor', 'gemini', 'copilot', 'opencode'],
+    }).notNull(),
+    installed: boolean('installed').default(false).notNull(),
+    authenticated: boolean('authenticated').default(false).notNull(),
+    authMethod: text('auth_method', {
+      enum: ['api_key', 'subscription', 'oauth'],
+    }),
+    lastCheckedAt: timestamp('last_checked_at'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex('user_env_clis_env_cli_idx').on(table.environmentId, table.cli)],
+)
+
+export type UserEnvCli = typeof userEnvClis.$inferSelect
+export type InsertUserEnvCli = typeof userEnvClis.$inferInsert
+
+// Ephemeral ttyd processes used for interactive CLI logins from the web UI.
+// Each session is tied to a specific user env + single CLI command; ttyd is
+// spawned with `--once`, so the row is closed as soon as the user disconnects.
+export const terminalSessions = pgTable(
+  'terminal_sessions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    environmentId: text('environment_id')
+      .notNull()
+      .references(() => userEnvironments.id, { onDelete: 'cascade' }),
+    linuxUsername: text('linux_username').notNull(),
+    cli: text('cli', {
+      enum: ['claude', 'codex', 'cursor', 'gemini', 'copilot', 'opencode', 'bash'],
+    }).notNull(),
+    port: integer('port').notNull(),
+    token: text('token').notNull(),
+    status: text('status', {
+      enum: ['starting', 'ready', 'closed', 'error'],
+    })
+      .default('starting')
+      .notNull(),
+    pid: integer('pid'),
+    createdAt: timestamp('created_at').defaultNow().notNull(),
+    expiresAt: timestamp('expires_at').notNull(),
+    closedAt: timestamp('closed_at'),
+    errorMessage: text('error_message'),
+  },
+  (table) => [
+    uniqueIndex('terminal_sessions_user_idx').on(table.userId, table.id),
+    uniqueIndex('terminal_sessions_port_idx').on(table.port),
+  ],
+)
+
+export type TerminalSession = typeof terminalSessions.$inferSelect
+export type InsertTerminalSession = typeof terminalSessions.$inferInsert
 
 // Task artifacts — deliverables produced by office-cowork tasks
 export const taskArtifacts = pgTable('task_artifacts', {

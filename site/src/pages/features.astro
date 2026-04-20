@@ -15,13 +15,13 @@ const FEATURE_SECTIONS = [
     ],
   },
   {
-    title: 'Isolated Docker Sandboxes',
-    description: 'Every task runs in a fresh, isolated Docker container with a full development environment. Install dependencies, run builds, execute tests — all without touching your local machine.',
+    title: 'Persistent Linux Environments',
+    description: 'Every team member gets a dedicated Linux account on your company VPS. Repo checkouts, CLI logins, dependency caches and browser state persist across tasks — no cold start, no re-authentication.',
     items: [
       'Full Node.js, Python, and system tool access',
-      'Persistent file system within sandbox sessions',
-      'Automatic dependency installation',
-      'Configurable sandbox duration',
+      'Repo working copies reused across tasks',
+      'One-time CLI logins (claude, gh, cursor…) via a web terminal',
+      'Shared caches (pnpm / npm / uv / cargo) stay warm',
     ],
   },
   {
@@ -46,20 +46,20 @@ const FEATURE_SECTIONS = [
   },
   {
     title: 'Bring Your Own Key',
-    description: 'Use your own API keys for AI providers like Anthropic, OpenAI, and Google. Keys are encrypted at rest and used only within your isolated sandboxes. Or skip the hassle and use the included shared quota.',
+    description: 'Use your own API keys for AI providers like Anthropic, OpenAI, and Google. Keys are encrypted at rest and used only within your team\'s VPS. Or skip the hassle and use the included shared quota.',
     items: [
       'Encrypted key storage (AES-256-GCM)',
-      'Keys scoped to your sandboxes only',
+      'Keys scoped to your company VPS only',
       'Support for Anthropic, OpenAI, Google, and more',
       'Shared quota included in every plan',
     ],
   },
   {
     title: 'Security & Isolation',
-    description: 'Every session is isolated. Credentials are encrypted with JWE. Sandboxes are ephemeral Docker containers with no cross-tenant access. OAuth tokens are scoped and never logged.',
+    description: 'Per-user Linux accounts give each team member a private working directory and process space on the VPS. The app dispatches commands via `sudo -u <user>`; no other user can read or kill another\'s work. OAuth tokens are scoped and never logged.',
     items: [
-      'JWE-encrypted session cookies',
-      'Ephemeral, isolated Docker sandboxes',
+      'One dedicated Linux account per team member',
+      'Dispatch via sudo -u — never shared shells',
       'No credential logging — static log messages only',
       'Scoped OAuth tokens per provider',
     ],
@@ -67,7 +67,7 @@ const FEATURE_SECTIONS = [
 ]
 ---
 
-<Base title="Features - Cowork-Claw" description="Explore Cowork-Claw features: multi-agent orchestration, Docker sandboxes, GitHub integration, browser IDE, and more.">
+<Base title="Features - Cowork-Claw" description="Explore Cowork-Claw features: multi-agent orchestration, persistent Linux environments, GitHub integration, browser IDE, and more.">
   <section class="py-20 sm:py-28 px-4 sm:px-6">
     <div class="max-w-4xl mx-auto">
       <h1 class="text-3xl sm:text-4xl font-bold text-center mb-4">Features</h1>
@@ -103,10 +103,10 @@ const FEATURE_SECTIONS = [
   <section class="py-16 sm:py-20 px-4 sm:px-6 bg-muted/30 border-t border-border">
     <div class="max-w-2xl mx-auto text-center">
       <h2 class="text-xl sm:text-2xl font-bold mb-4">Start shipping with AI agents</h2>
-      <p class="text-muted-foreground mb-6">Sign in with GitHub and launch your first task in minutes.</p>
+      <p class="text-muted-foreground mb-6">Sign in and launch your first task in minutes.</p>
       <div class="flex items-center justify-center gap-3 flex-wrap">
         <a
-          href={`${APP_URL}/api/auth/signin/github`}
+          href={`${APP_URL}/auth`}
           class="inline-flex items-center justify-center rounded-md bg-primary px-6 py-3 text-sm font-medium text-primary-foreground shadow-sm hover:opacity-90 transition-opacity"
         >
           Get Started
