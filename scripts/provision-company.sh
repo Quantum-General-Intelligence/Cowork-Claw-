@@ -2,60 +2,67 @@
 set -euo pipefail
 
 # ═══════════════════════════════════════════════════════════════════
-# provision-company.sh — Deploy a per-company Cowork-Claw instance
+# provision-company.sh — Deploy a company tenant onto the QGI VPS
+#
+# All QGI-owned companies share ONE Hostinger VPS (gallitron-V32).
+# This script drops a tenant stack onto it:
+#   /opt/cowork-claw-<company>/  (code + compose + .env.local)
+#   docker-compose labelled for Traefik at <company>.cowork-claw.ai
+#   DNS A record to 31.220.108.185
+#
+# Prerequisites on the host (set up once, outside this script):
+#   - Docker + Traefik (baked into the Hostinger template)
+#   - scripts/install-vps-clis.sh has been run (Node, pnpm, ttyd, Caddy,
+#     claude/codex/cursor/gemini/copilot CLIs). This runs from this
+#     script too, and is idempotent.
 #
 # Usage:
-#   Internal (existing VPS):
-#     ./scripts/provision-company.sh --company trelexa --ip 31.220.108.185 --internal
-#
-#   Client (new Hostinger VPS):
-#     ./scripts/provision-company.sh --company acme --vps-id 796886
-#
-# What it does:
-#   1. Installs SSH key on the target VPS (via Hostinger API if needed)
-#   2. Installs Docker if missing
-#   3. Creates /opt/cowork-claw-{company}/ with the app code
-#   4. Configures .env.local (shared Supabase, company-specific settings)
-#   5. Creates a docker-compose for that company
-#   6. Creates DNS record: {company}.cowork-claw.ai → VPS IP
-#   7. Builds the Docker image
-#   8. Runs DB migrations
-#   9. Seeds company-specific templates
-#  10. Starts the containers
+#   ./scripts/provision-company.sh --company trelexa
+#   ./scripts/provision-company.sh --company acme --port 3042
 #
 # Env vars required (from .env.local):
-#   HOSTINGER_API_TOKEN, CF_API_EMAIL, CF_GLOBAL_API_KEY, SANDBOX_SSH_KEY
+#   SANDBOX_SSH_KEY  (base64 PEM, authorized on gallitron as root)
+#   CF_API_EMAIL, CF_GLOBAL_API_KEY   (Cloudflare for DNS)
 #   NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY
 # ═══════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Parse args
-COMPANY=""
-IP=""
-VPS_ID=""
-INTERNAL=false
-PORT=3000
+# ── QGI single-VPS constants (gallitron-V32 / Hostinger id 857641) ──
+QGI_VPS_IP="31.220.108.185"
+QGI_VPS_HOSTNAME="gallitron-V32.qgi.dev"
 CF_ZONE_ID="5ccd9aac7ce696b64c3f561597cc124f"
+
+# ── Args ────────────────────────────────────────────────────────────
+COMPANY=""
+PORT=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
     --company) COMPANY="$2"; shift 2 ;;
-    --ip) IP="$2"; shift 2 ;;
-    --vps-id) VPS_ID="$2"; shift 2 ;;
-    --internal) INTERNAL=true; shift ;;
-    --port) PORT="$2"; shift 2 ;;
+    --port)    PORT="$2"; shift 2 ;;
+    -h|--help)
+      sed -n '1,25p' "$0" | sed 's/^# \{0,1\}//'
+      exit 0
+      ;;
     *) echo "Unknown arg: $1"; exit 1 ;;
   esac
 done
 
 if [ -z "$COMPANY" ]; then
-  echo "Usage: $0 --company <name> [--ip <ip> | --vps-id <id>] [--internal] [--port <port>]"
+  echo "Usage: $0 --company <name> [--port <port>]"
   exit 1
 fi
 
-# Load env
+# Deterministic port per company in 3000..3099 so multiple tenants on
+# the same host never collide. Override via --port for a pinned value.
+if [ -z "$PORT" ]; then
+  # 0x64 = 100; shifts hash into the 3000..3099 range.
+  PORT=$(( 3000 + ( 0x$(printf '%s' "$COMPANY" | sha256sum | head -c 8) % 100 ) ))
+fi
+
+# ── Load local env ──────────────────────────────────────────────────
 set -a
 source "$REPO_ROOT/.env.local" 2>/dev/null || true
 set +a
@@ -65,97 +72,62 @@ DEPLOY_DIR="/opt/cowork-claw-${COMPANY}"
 SSH_KEY_FILE=$(mktemp)
 trap 'rm -f "$SSH_KEY_FILE"' EXIT
 
-# ── Step 1: Get VPS IP ──────────────────────────────────────────
-if [ -z "$IP" ] && [ -n "$VPS_ID" ]; then
-  echo "[1/10] Looking up VPS $VPS_ID IP..."
-  IP=$(curl -s "https://developers.hostinger.com/api/vps/v1/virtual-machines/$VPS_ID" \
-    -H "Authorization: Bearer $HOSTINGER_API_TOKEN" | python3 -c "
-import sys,json
-d=json.load(sys.stdin)
-ipv4=d.get('ipv4',[])
-print(ipv4[0]['address'] if isinstance(ipv4,list) and len(ipv4)>0 else '')
-" 2>/dev/null)
-  echo "  IP: $IP"
-fi
-
-if [ -z "$IP" ]; then
-  echo "ERROR: No IP. Provide --ip or --vps-id"
-  exit 1
-fi
-
-# ── Step 2: Install SSH key ─────────────────────────────────────
-echo "[2/10] Setting up SSH access to $IP..."
 printf '%s' "$SANDBOX_SSH_KEY" | base64 -d > "$SSH_KEY_FILE"
 chmod 600 "$SSH_KEY_FILE"
 SSH="ssh -i $SSH_KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10"
 
-# Test if key works
-if $SSH root@$IP 'echo SSH_OK' 2>/dev/null | grep -q SSH_OK; then
-  echo "  SSH key already works"
-else
-  echo "  SSH key not authorized — installing via Hostinger API..."
-  if [ -z "$VPS_ID" ]; then
-    echo "  ERROR: Need --vps-id to install SSH key via API"
-    exit 1
-  fi
+echo "═══════════════════════════════════════════════"
+echo "  Provisioning company tenant on QGI VPS"
+echo "═══════════════════════════════════════════════"
+echo "  Company:    $COMPANY"
+echo "  Subdomain:  $SUBDOMAIN"
+echo "  Port:       $PORT"
+echo "  Host:       $QGI_VPS_HOSTNAME ($QGI_VPS_IP)"
+echo "  Deploy dir: $DEPLOY_DIR"
+echo "  ────────────────────────────────────────────"
 
-  # Reset password via Hostinger API
-  NEW_PASS="CoworkClaw-$(openssl rand -hex 4)"
-  curl -s -X POST "https://developers.hostinger.com/api/vps/v1/virtual-machines/$VPS_ID/reset-root-password" \
-    -H "Authorization: Bearer $HOSTINGER_API_TOKEN" \
-    -H "Content-Type: application/json" \
-    -d "{\"password\": \"$NEW_PASS\"}" > /dev/null 2>&1
-
-  echo "  Waiting for password reset (30s)..."
-  sleep 30
-
-  # Install SSH key via sshpass
-  if command -v sshpass >/dev/null 2>&1; then
-    PUB_KEY=$(ssh-keygen -y -f "$SSH_KEY_FILE" 2>/dev/null)
-    sshpass -p "$NEW_PASS" ssh -o StrictHostKeyChecking=no root@$IP \
-      "mkdir -p ~/.ssh && echo '$PUB_KEY' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys" 2>/dev/null
-    echo "  SSH key installed"
-  else
-    echo "  WARNING: sshpass not available. Manually install SSH key on $IP"
-    echo "  Password: $NEW_PASS"
-    echo "  Then re-run this script."
-    exit 1
-  fi
+# ── Step 1: SSH reachability ────────────────────────────────────────
+echo "[1/8] Verifying SSH access to $QGI_VPS_IP..."
+if ! $SSH "root@$QGI_VPS_IP" 'echo SSH_OK' 2>/dev/null | grep -q SSH_OK; then
+  echo "  ERROR: Cannot SSH to $QGI_VPS_IP as root."
+  echo "  Check SANDBOX_SSH_KEY is authorized on gallitron-V32."
+  exit 1
 fi
+echo "  ✓ SSH OK"
 
-# ── Step 3: Install Docker if missing ───────────────────────────
-echo "[3/10] Checking Docker on $IP..."
-DOCKER_OK=$($SSH root@$IP 'docker --version 2>/dev/null && echo OK || echo MISSING' 2>/dev/null | tail -1)
+# ── Step 2: Host bootstrap (idempotent) ─────────────────────────────
+echo "[2/8] Ensuring Docker + VPS CLIs + ttyd + Caddy are installed..."
+DOCKER_OK=$($SSH "root@$QGI_VPS_IP" 'docker --version 2>/dev/null && echo OK || echo MISSING' | tail -1)
 if [ "$DOCKER_OK" = "MISSING" ]; then
-  echo "  Installing Docker..."
-  $SSH root@$IP 'curl -fsSL https://get.docker.com | sh' 2>/dev/null
+  $SSH "root@$QGI_VPS_IP" 'curl -fsSL https://get.docker.com | sh' >/dev/null 2>&1
+  echo "  ✓ Docker installed"
+else
+  echo "  ✓ Docker already present"
 fi
-echo "  Docker: $($SSH root@$IP 'docker --version 2>/dev/null' | head -1)"
 
-# ── Step 4: Deploy code ─────────────────────────────────────────
-echo "[4/10] Deploying code to $IP:$DEPLOY_DIR..."
-$SSH root@$IP "mkdir -p $DEPLOY_DIR /var/lib/cowork-artifacts"
+$SSH "root@$QGI_VPS_IP" "mkdir -p /var/lib/cowork-artifacts"
+$SSH "root@$QGI_VPS_IP" "bash -s" < "$REPO_ROOT/scripts/install-vps-clis.sh" 2>&1 | tail -5
+echo "  ✓ Host bootstrap complete"
 
-rsync -avz --delete \
+# ── Step 3: Sync code ───────────────────────────────────────────────
+echo "[3/8] Syncing code to $DEPLOY_DIR..."
+$SSH "root@$QGI_VPS_IP" "mkdir -p $DEPLOY_DIR"
+rsync -az --delete \
   --exclude 'node_modules' --exclude '.next' --exclude '.env.local' \
   --exclude '.git' --exclude 'modules' --exclude 'opensrc' --exclude '.claude' \
   --exclude 'docs/superpowers' --exclude 'docker-compose.prod.yml' \
   -e "ssh -i $SSH_KEY_FILE -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
-  "$REPO_ROOT/" "root@$IP:$DEPLOY_DIR/" > /dev/null 2>&1
-echo "  Code synced"
+  "$REPO_ROOT/" "root@$QGI_VPS_IP:$DEPLOY_DIR/" >/dev/null 2>&1
+echo "  ✓ Code synced"
 
-# ── Step 5: Configure .env.local ────────────────────────────────
-echo "[5/10] Configuring environment..."
-
-# Generate company-specific secrets
+# ── Step 4: .env.local for this tenant ──────────────────────────────
+echo "[4/8] Writing .env.local..."
 ENC_KEY=$(openssl rand -hex 32)
-
-# Create SSH key for sandbox (self-referencing — the VPS runs its own containers)
 SELF_SSH_KEY=$SANDBOX_SSH_KEY
 
-$SSH root@$IP "cat > $DEPLOY_DIR/.env.local << 'ENVEOF'
-# ── Cowork-Claw: ${COMPANY} instance ──
-POSTGRES_URL=postgresql://cowork:CoworkClaw-DB-2026@31.220.108.185:5432/coworkclaw
+$SSH "root@$QGI_VPS_IP" "cat > $DEPLOY_DIR/.env.local << 'ENVEOF'
+# ── Cowork-Claw tenant: ${COMPANY} on QGI VPS ──
+POSTGRES_URL=postgresql://cowork:CoworkClaw-DB-2026@127.0.0.1:5432/coworkclaw
 ENCRYPTION_KEY=${ENC_KEY}
 
 # Supabase (shared — handles all auth: email, Google, GitHub)
@@ -165,11 +137,11 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY}
 # Which providers to surface on /auth
 NEXT_PUBLIC_AUTH_PROVIDERS=${NEXT_PUBLIC_AUTH_PROVIDERS:-email,google,github}
 
-# Optional: deep-link client ID for the "Reconfigure GitHub access" UX
+# Optional: deep-link client ID for the 'Reconfigure GitHub access' UX
 NEXT_PUBLIC_GITHUB_CLIENT_ID=${NEXT_PUBLIC_GITHUB_CLIENT_ID:-}
 
-# Company VPS control-plane SSH (self — connects back to this same box as
-# root so the app can provision/dispatch to per-user Linux accounts)
+# Company VPS control-plane SSH (loopback — the app dispatches tasks
+# to per-user Linux accounts on this same host via sudo -u)
 SANDBOX_SSH_HOST=127.0.0.1
 SANDBOX_SSH_PORT=22
 SANDBOX_SSH_USER=root
@@ -193,11 +165,11 @@ STRIPE_WHITELABEL_PRICE_ID=${STRIPE_WHITELABEL_PRICE_ID:-}
 STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
 ENVEOF
 "
-echo "  .env.local written"
+echo "  ✓ .env.local written"
 
-# ── Step 6: Create docker-compose ───────────────────────────────
-echo "[6/10] Creating docker-compose..."
-$SSH root@$IP "cat > $DEPLOY_DIR/docker-compose.prod.yml << 'COMPEOF'
+# ── Step 5: docker-compose.prod.yml ─────────────────────────────────
+echo "[5/8] Writing docker-compose..."
+$SSH "root@$QGI_VPS_IP" "cat > $DEPLOY_DIR/docker-compose.prod.yml << 'COMPEOF'
 services:
   cowork-claw-${COMPANY}:
     build:
@@ -220,61 +192,61 @@ services:
       - \"traefik.http.services.cw-${COMPANY}.loadbalancer.server.url=http://127.0.0.1:${PORT}\"
 COMPEOF
 "
-echo "  Compose created (port $PORT, subdomain $SUBDOMAIN)"
+echo "  ✓ Compose written (port $PORT → Traefik @ $SUBDOMAIN)"
 
-# ── Step 7: Create DNS record ───────────────────────────────────
-echo "[7/10] Creating DNS: $SUBDOMAIN → $IP..."
-# Check if record exists
+# ── Step 6: DNS (Cloudflare) ────────────────────────────────────────
+echo "[6/8] Upserting Cloudflare DNS $SUBDOMAIN → $QGI_VPS_IP..."
 EXISTING=$(curl -s "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records?type=A&name=$SUBDOMAIN" \
   -H "X-Auth-Email: $CF_API_EMAIL" \
-  -H "X-Auth-Key: $CF_GLOBAL_API_KEY" | python3 -c "import sys,json; print(json.load(sys.stdin)['result'][0]['id'] if json.load(open('/dev/stdin' if False else sys.stdin))['result'] else '')" 2>/dev/null || echo "")
+  -H "X-Auth-Key: $CF_GLOBAL_API_KEY" \
+  | python3 -c "
+import sys, json
+try:
+    r = json.load(sys.stdin).get('result', [])
+    print(r[0]['id'] if r else '')
+except Exception:
+    print('')
+" 2>/dev/null || echo "")
 
-if [ -n "$EXISTING" ] && [ "$EXISTING" != "" ]; then
+if [ -n "$EXISTING" ]; then
   curl -s -X PUT "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records/$EXISTING" \
     -H "X-Auth-Email: $CF_API_EMAIL" \
     -H "X-Auth-Key: $CF_GLOBAL_API_KEY" \
     -H "Content-Type: application/json" \
-    --data "{\"type\":\"A\",\"name\":\"$SUBDOMAIN\",\"content\":\"$IP\",\"proxied\":false,\"ttl\":300}" > /dev/null 2>&1
-  echo "  Updated existing record"
+    --data "{\"type\":\"A\",\"name\":\"$SUBDOMAIN\",\"content\":\"$QGI_VPS_IP\",\"proxied\":false,\"ttl\":300}" > /dev/null
+  echo "  ✓ Updated existing A record"
 else
   curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/dns_records" \
     -H "X-Auth-Email: $CF_API_EMAIL" \
     -H "X-Auth-Key: $CF_GLOBAL_API_KEY" \
     -H "Content-Type: application/json" \
-    --data "{\"type\":\"A\",\"name\":\"$SUBDOMAIN\",\"content\":\"$IP\",\"proxied\":false,\"ttl\":300}" > /dev/null 2>&1
-  echo "  Created new record"
+    --data "{\"type\":\"A\",\"name\":\"$SUBDOMAIN\",\"content\":\"$QGI_VPS_IP\",\"proxied\":false,\"ttl\":300}" > /dev/null
+  echo "  ✓ Created new A record"
 fi
 
-# ── Step 8: Build Docker image ──────────────────────────────────
-echo "[8/10] Building Docker image (this takes 3-5 min)..."
-$SSH root@$IP "cd $DEPLOY_DIR && docker compose -f docker-compose.prod.yml build --no-cache 2>&1 | tail -3"
+# ── Step 7: Build + start ───────────────────────────────────────────
+echo "[7/8] Building image (3-5 min)..."
+$SSH "root@$QGI_VPS_IP" "cd $DEPLOY_DIR && docker compose -f docker-compose.prod.yml build --no-cache 2>&1 | tail -3"
 
-# ── Step 9: Install agent CLIs + ttyd on the host ───────────────
-# Persistent-user-environments model: CLIs live on the VPS, not in a runner
-# image. This bootstrap is idempotent; safe to re-run.
-echo "[9/10] Installing agent CLIs + ttyd on host..."
-$SSH root@$IP "bash -s" < "$REPO_ROOT/scripts/install-vps-clis.sh" 2>&1 | tail -10
+echo "[8/8] Starting container..."
+$SSH "root@$QGI_VPS_IP" "cd $DEPLOY_DIR && docker compose -f docker-compose.prod.yml up -d 2>&1 | tail -5"
 
-# ── Step 10: Start ──────────────────────────────────────────────
-echo "[10/10] Starting..."
-$SSH root@$IP "cd $DEPLOY_DIR && docker compose -f docker-compose.prod.yml up -d 2>&1"
-
-# Wait and verify
+# Verify
 sleep 8
-STATUS=$($SSH root@$IP "curl -sL -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/auth" 2>/dev/null)
+STATUS=$($SSH "root@$QGI_VPS_IP" "curl -sL -o /dev/null -w '%{http_code}' http://127.0.0.1:$PORT/auth" 2>/dev/null)
 
 echo ""
 echo "═══════════════════════════════════════════════"
-echo "  COMPANY INSTANCE PROVISIONED"
+echo "  TENANT PROVISIONED"
 echo "═══════════════════════════════════════════════"
-echo "  Company:   $COMPANY"
 echo "  URL:       https://$SUBDOMAIN"
-echo "  VPS:       $IP (port $PORT)"
+echo "  Local:     http://127.0.0.1:$PORT (on gallitron)"
 echo "  Deploy:    $DEPLOY_DIR"
 echo "  Status:    HTTP $STATUS"
 echo ""
 echo "  Next steps:"
-echo "    1. Add $SUBDOMAIN redirect URL in Supabase dashboard"
-echo "    2. Seed templates: POSTGRES_URL=... pnpm exec tsx scripts/seed-templates.ts"
+echo "    1. Add $SUBDOMAIN/auth/callback to Supabase → URL Redirects"
+echo "    2. Seed templates if needed:"
+echo "         POSTGRES_URL=... pnpm exec tsx scripts/seed-templates.ts"
 echo "    3. Share https://$SUBDOMAIN with the team"
 echo "═══════════════════════════════════════════════"
